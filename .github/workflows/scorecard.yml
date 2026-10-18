@@ -1,0 +1,90 @@
+# ==============================================================================
+# OSSF Scorecard — supply-chain & repo-posture monitor
+# ==============================================================================
+# Watches that the guardrails themselves don't erode over many AI-assisted PRs
+# (branch protection, pinned actions, token permissions, dangerous workflows).
+# Runs weekly + when a branch-protection rule changes. A
+# regression turns THIS workflow red (a visible signal); it is not a per-PR gate.
+#
+# On a PRIVATE repo Scorecard cannot run at all without a token: its GraphQL queries
+# are not permitted to the default GITHUB_TOKEN, so it aborts before writing results.
+# Set the repo secret SCORECARD_TOKEN — a *classic* PAT with `repo` scope; a
+# fine-grained PAT is NOT sufficient. Without it this workflow stays green and warns
+# that monitoring is inactive. On a public repo no PAT is needed. See ONBOARDING.md.
+# GHAS is NOT required (results are uploaded as an artifact, not to the Security tab).
+# ==============================================================================
+
+name: Scorecard
+
+# COST: this ran on every push to the default branch, billing a full job-minute each time to
+# re-measure a posture that changes rarely. The weekly schedule is the designed cadence, and
+# `branch_protection_rule` still fires immediately on the drift that matters most.
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "27 6 * * 1" # Mondays 06:27 UTC
+
+# Nothing at the workflow level; the one job below names exactly what it needs. This was
+# `read-all`, which granted read on every scope to anything the job runs (zizmor
+# excessive-permissions, ADR-0018).
+permissions: {}
+
+# One analysis at a time; a second trigger waits rather than racing the first.
+concurrency:
+  group: scorecard-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  analysis:
+    name: analysis
+    # SCORECARD_TOKEN is a classic PAT with `repo` scope — the broadest credential this repository
+    # holds. It lives in the `scorecard` environment, not in repository secrets, so no other job
+    # or workflow can read it (zizmor secrets-outside-env, ADR-0018). Set it with:
+    #   gh secret set SCORECARD_TOKEN --env scorecard
+    environment: scorecard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # `id-token: write` was removed: it is needed only to PUBLISH results (OIDC to the
+    # Scorecard API), and publish_results is false here. A grant nothing uses is attack surface.
+    # The reads below are documented as required by ossf/scorecard-action; their absence is the
+    # documented cause of "Resource not accessible by integration", after which the tool aborts
+    # before writing results.json.
+    permissions:
+      contents: read # check out the repository and read its files
+      actions: read # inspect workflow runs (Dangerous-Workflow, CI-Tests checks)
+      issues: read # query issues for the Maintained check
+      pull-requests: read # query pull requests for Code-Review and CI-Tests checks
+      checks: read # read check runs for the CI-Tests and SAST checks
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Degrade at THIS layer, not just in the gate. On a private repo Scorecard's GraphQL
+      # ListCommits query is not permitted to the default GITHUB_TOKEN, so the tool aborts and
+      # writes no results.json at all — the gate's own skip logic never gets to run. Without
+      # continue-on-error a brand-new private repo has a permanently red workflow, which trains
+      # the adopter to ignore failing workflows. The gate below still fails on a real regression.
+      - name: Run Scorecard
+        continue-on-error: true
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
+        with:
+          results_file: results.json
+          results_format: json
+          repo_token: ${{ secrets.SCORECARD_TOKEN || github.token }}
+          publish_results: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Gate on curated checks
+        run: python3 scripts/scorecard_gate.py results.json --min 7
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-results
+          path: results.json
+          retention-days: 14

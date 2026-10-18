@@ -1,0 +1,28 @@
+# golangci-lint for the trust services (Addendum 03 §12, docs/standards/go.md).
+#
+# `default: standard` keeps golangci-lint's own baseline (errcheck, govet, ineffassign,
+# staticcheck, unused); the list adds the linters that matter for code that signs and verifies:
+# gosec for security, and the ones that catch unchecked errors, shadowing and silent fallthrough.
+# A linter is never disabled here to make code pass — fix the code (GO-001).
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - gosec
+    - errorlint
+    - bodyclose
+    - copyloopvar
+    - misspell
+    - nilerr
+    - revive
+    - unconvert
+    - wrapcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+run:
+  timeout: 5m

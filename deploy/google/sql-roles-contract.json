@@ -1,0 +1,40 @@
+{
+  "status": "source_preparation_only",
+  "deployment_authorized": false,
+  "database": "appdb",
+  "schema_revision": "0018lifecycle",
+  "operator": "accord_migrator",
+  "creation_sql": "deploy/google/sql-runtime-roles.sql",
+  "grants_sql": "deploy/google/sql-runtime-grants.sql",
+  "roles": {
+    "api": "accord_api",
+    "reference": "accord_reference",
+    "compliance": "accord_compliance"
+  },
+  "prepared_login_enabled": false,
+  "role_memberships": [],
+  "operator_role_administration": "creator_ADMIN_membership_permitted_only",
+  "administrative_attributes": false,
+  "schema_object_ownership": false,
+  "public_schema_create": false,
+  "public_database_temporary": false,
+  "default_privilege_grants": [],
+  "workspace_isolation": "existing_forced_RLS_and_verified_application_scope",
+  "membership_and_identity_writes": false,
+  "api_original_payload_deletion": false,
+  "reference_original_payload_access": false,
+  "reference_analysis_capture_access": true,
+  "reference_head_update_authority": true,
+  "compliance_persona_table_access": false,
+  "compliance_event_delete_authority": "table_wide_application_retention_predicate",
+  "spine_workspace_isolation": "application_queries_not_database_RLS",
+  "immutable_lock_columns": {
+    "persona_private_evidence": "id",
+    "persona_passport_publications": "id"
+  },
+  "postgresql_acceptance": "32_disposable_tests_passed_full_gate_pending",
+  "production_grants": "not_executed",
+  "credential_and_login_activation": "separate_owner_checkpoint_pending",
+  "tasks_queue": "PAUSED",
+  "zynth_sign_in": "later"
+}

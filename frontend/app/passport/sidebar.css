@@ -1,0 +1,76 @@
+.sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 40px;
+}
+.sidebar-collapse {
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding: 0;
+}
+.sidebar nav {
+  flex-shrink: 0;
+}
+.sidebar-bottom {
+  flex-shrink: 0;
+}
+.sidebar-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  width: 100%;
+}
+@media (min-width: 761px) {
+  .sidebar {
+    overflow-y: auto;
+  }
+  .sidebar.is-collapsed {
+    width: 68px;
+    padding: var(--space-3) var(--space-2);
+  }
+  .is-collapsed .brand-name,
+  .is-collapsed .workspace,
+  .is-collapsed .nav-label,
+  .is-collapsed .nav-text,
+  .is-collapsed .count,
+  .is-collapsed .sidebar-bottom {
+    display: none;
+  }
+  .is-collapsed .sidebar-brand-row {
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+  .is-collapsed .wordmark {
+    justify-content: center;
+    padding: 0;
+  }
+  .is-collapsed .nav-item,
+  .is-collapsed .utility-nav button {
+    justify-content: center;
+    padding: var(--space-2);
+  }
+  .is-collapsed .utility-nav {
+    margin-top: var(--space-4);
+  }
+}
+@media (max-width: 760px) {
+  .sidebar-brand-row {
+    min-height: 44px;
+  }
+  .sidebar-collapse {
+    margin-left: auto;
+  }
+}

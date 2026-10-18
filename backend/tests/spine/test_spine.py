@@ -1,0 +1,141 @@
+"""Spine behavior: emit → ingest → seal → verify, plus authenticated client reporting."""
+
+from __future__ import annotations
+
+from conftest import auth_headers, stream_events
+from fakeredis.aioredis import FakeRedis
+from httpx import AsyncClient
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from accord.auth.principal import Principal
+from accord.command.audit import AUDITABLE_ACTIONS, seal_new, verify_chain
+from accord.command.consumer import _to_row, consume_once
+from accord.command.models import Event
+from accord.telemetry.emitter import Telemetry, emit
+from accord.telemetry.envelope import SOURCE_CLIENT, SOURCE_SERVER, make_event
+
+
+async def test_ingest_seal_and_verify(fake_redis: FakeRedis, session: AsyncSession) -> None:
+    await emit(
+        fake_redis,
+        make_event(category="example", action="persona.version_read", outcome="success"),
+    )
+    stored = await consume_once(fake_redis, session)
+    assert stored == 1
+    assert await session.scalar(select(func.count()).select_from(Event)) == 1
+
+    # Re-draining is idempotent (event_id is the primary key).
+    assert await consume_once(fake_redis, session) == 0
+
+    # Sealing chains the auditable event; the chain then verifies.
+    assert await seal_new(session) == 1
+    ok, broken_seq, total = await verify_chain(session)
+    assert ok is True and broken_seq is None and total == 1
+
+
+async def test_client_route_emits_ingestable_event(
+    client: AsyncClient, fake_redis: FakeRedis, session: AsyncSession
+) -> None:
+    resp = await client.post(
+        "/api/v1/client-events", json={"action": "client.route_view"}, headers=auth_headers()
+    )
+    assert resp.status_code == 202
+
+    stored = await consume_once(fake_redis, session)
+    assert stored == 1
+    event = (await session.execute(select(Event))).scalar_one()
+    assert event.action == "client.route_view" and event.source == "client"
+
+
+async def test_a_client_reported_event_is_never_sealed(
+    fake_redis: FakeRedis, session: AsyncSession
+) -> None:
+    """The runtime half of the trust boundary (docs/decisions/0012).
+
+    The static guard in test_coverage_guards.py stops a client action being *registered* as
+    auditable. This proves the sealing query itself refuses one — so a mistake in the registry
+    and a mistake in the code are two independent failures, not one.
+    """
+    auditable = next(iter(AUDITABLE_ACTIONS))
+    await emit(
+        fake_redis,
+        make_event(category="client", action=auditable, outcome="success", source=SOURCE_CLIENT),
+    )
+    await consume_once(fake_redis, session)
+
+    stored = (await session.execute(select(Event))).scalars().all()
+    assert len(stored) == 1, "the event must still be stored — it is data, just not evidence"
+    assert stored[0].source == SOURCE_CLIENT
+
+    sealed = await seal_new(session)
+    assert sealed == 0, (
+        "a client-reported event was sealed into the audit chain even though its action is "
+        "auditable — the source filter in seal_new is not doing anything"
+    )
+
+
+async def test_a_server_observed_event_with_the_same_action_is_sealed(
+    fake_redis: FakeRedis, session: AsyncSession
+) -> None:
+    """The other direction: the filter must not be refusing everything."""
+    auditable = next(iter(AUDITABLE_ACTIONS))
+    await emit(fake_redis, make_event(category="x", action=auditable, outcome="success"))
+    await consume_once(fake_redis, session)
+    assert await seal_new(session) == 1
+
+
+async def test_the_emitter_overwrites_attribution_on_client_sourced_events(
+    fake_redis: FakeRedis,
+) -> None:
+    """For source=client the emitter enforces attribution itself (ADR-0012).
+
+    The route is careful to pass no actor fields, but the guarantee must not depend on every
+    future call site remembering that — a spoofed actor on a client-sourced event is overwritten
+    with the verified principal, not merely defaulted.
+    """
+    principal = Principal(type="user", id="user-123", sid="sess-9")
+    tel = Telemetry(fake_redis, ip="198.51.100.7", principal=principal)
+    await tel.emit(
+        category="client",
+        action="client.error",
+        outcome="success",
+        source=SOURCE_CLIENT,
+        actor_type="system",
+        actor_id="root",
+        sid="someone-else",
+        ip="10.0.0.1",
+    )
+    (event,) = await stream_events(fake_redis)
+    assert event["actor"] == {"type": "user", "id": "user-123", "sid": "sess-9"}
+    assert event["ip"] == "198.51.100.7"
+
+
+async def test_the_emitter_still_honors_explicit_actor_on_server_events(
+    fake_redis: FakeRedis,
+) -> None:
+    """The other direction: a server-observed emit (a worker acting for a user) may name the
+    actor explicitly — only client-sourced events lose that ability."""
+    tel = Telemetry(fake_redis, ip=None, principal=Principal(type="system"))
+    await tel.emit(
+        category="jobs", action="persona.version_read", outcome="success", actor_id="batch-runner"
+    )
+    (event,) = await stream_events(fake_redis)
+    assert event["actor"]["id"] == "batch-runner"
+    assert event["source"] == SOURCE_SERVER
+
+
+def test_consumer_backfills_absent_source_but_never_upgrades_unknown_values() -> None:
+    """Absent source = a pre-field event from this service (only the server writes the stream):
+    backfilling it as server-observed is correct. A PRESENT unknown value is kept verbatim, so
+    the sealer's source filter excludes it — fail-closed for the chain, never `or`-coerced into
+    trusted "server"."""
+    base = make_event(category="x", action="persona.version_read", outcome="success")
+    absent = dict(base)
+    del absent["source"]
+    assert _to_row(absent)["source"] == SOURCE_SERVER
+
+    garbage = dict(make_event(category="x", action="persona.version_read", outcome="success"))
+    garbage["event_id"] = "f" * 32
+    garbage["source"] = ""
+    assert _to_row(garbage)["source"] == "", "an empty-string source must not become trusted"

@@ -1,0 +1,84 @@
+# Gen6th Accord Codex candidate. Owner installs this under /etc/codex only after review.
+# This is a restrictive Mac-wide floor. Other repositories remain sealed until
+# their own exact paths are reviewed and added as separate permission profiles.
+allowed_approval_policies = ["never"]
+allowed_approvals_reviewers = ["user"]
+allowed_web_search_modes = ["disabled"]
+default_permissions = "sealed"
+allow_managed_hooks_only = true
+allow_browser_and_computer_use = false
+allow_appshots = false
+allow_remote_control = false
+allow_login_shell = false
+
+[allowed_permission_profiles]
+"sealed" = true
+"gen6th-accord" = true
+
+[features]
+apps = false
+plugins = false
+hooks = true
+browser_use = false
+browser_use_external = false
+browser_use_full_cdp_access = false
+computer_use = false
+in_app_browser = false
+
+[permissions.sealed]
+description = "No project source access until an owner-selected profile applies"
+
+[permissions.sealed.filesystem]
+":root" = "deny"
+":minimal" = "read"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+
+[permissions.sealed.network]
+enabled = false
+
+[permissions.gen6th-accord]
+description = "Only Gen6th Accord source and bounded scratch are writable"
+
+[permissions.gen6th-accord.filesystem]
+":root" = "deny"
+":minimal" = "read"
+":tmpdir" = "write"
+":slash_tmp" = "write"
+"~/.gitconfig" = "read"
+"~/.config/git" = "read"
+"/path/to/gen6th-accord" = "write"
+"/path/to/gen6th-accord/.claude" = "read"
+"/path/to/gen6th-accord/.codex" = "read"
+"/path/to/gen6th-accord/.agents" = "read"
+"/path/to/gen6th-accord/.git" = "read"
+
+[permissions.gen6th-accord.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.local" = "deny"
+"**/.env.development" = "deny"
+"**/.env.staging" = "deny"
+"**/.env.test" = "deny"
+"**/.env.production" = "deny"
+"**/id_rsa" = "deny"
+"**/id_ed25519" = "deny"
+"**/id_ecdsa" = "deny"
+"**/*.p12" = "deny"
+"**/*.pfx" = "deny"
+"**/*.jks" = "deny"
+"**/*.gpg" = "deny"
+
+[permissions.gen6th-accord.network]
+enabled = false
+
+[hooks]
+managed_dir = "/etc/codex/hooks"
+
+[[hooks.PreToolUse]]
+matcher = "^Bash$"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "/usr/bin/python3 /etc/codex/hooks/accord_pre_tool.py"
+timeout = 10
+statusMessage = "Checking owner-only commands"

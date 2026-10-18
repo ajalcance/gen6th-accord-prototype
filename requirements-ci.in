@@ -1,0 +1,33 @@
+# The programs that decide whether a pull request is safe.
+#
+# These are NOT application dependencies. They are the scanners and the test runner the merge
+# gate runs, and swapping one for a poisoned build is the highest-leverage supply-chain move
+# against this repository. It was also, until this file existed, the one dependency change
+# nothing asked a human about: `backend/requirements*` sat in every "needs a human" list while
+# the programs judging the pull request were installed unpinned, straight from the index.
+#
+# This is the INPUT. requirements-ci.txt is generated from it with every transitive dependency
+# pinned and hashed (ADR-0018 rule 3). Until 2026-09-25 only these four top-level tools were
+# pinned, so everything they pulled in — semgrep alone brings dozens of packages — was whatever
+# PyPI served that morning, unverified. Regenerate after editing this file:
+#
+#   uv pip compile requirements-ci.in --universal --python-version 3.12 --generate-hashes \
+#     -o requirements-ci.txt
+#
+# scripts/check_pins.py reconciles this file with the lock in BOTH directions, and CI installs
+# with --require-hashes, so a lock that was not regenerated fails the build instead of
+# installing something unreviewed.
+#
+# CI uses the lock as a CONSTRAINTS file (`pip install --require-hashes -c requirements-ci.txt
+# <tool>`): one source of truth for every version and hash, while each job installs only the
+# tool it runs. The static job first proves pip enforces the hashes that way, with a canary.
+#
+# Both files are matched by `GUARD_FILE_RE` in scripts/meta_guard.py: changing either needs the
+# owner's `guardrail-change` label. Bumps arrive as Dependabot PRs (pip ecosystem, "/"), after
+# the 7-day cooldown that the sensitive-path waiver in ci.yml assumes.
+pre-commit==4.6.2
+semgrep==1.179.0
+pytest==9.1.1
+pyyaml==6.0.3
+# Security floor for the CI tools' JWT dependency; explicit owner-reviewed pin.
+pyjwt==2.15.0

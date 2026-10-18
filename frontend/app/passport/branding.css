@@ -1,0 +1,170 @@
+/* Brand additions. System fonts and static SVG from our own origin only: the content
+   security policy allows img-src 'self' data: blob: and forbids web fonts. */
+
+.wordmark .brand-mark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+.wordmark .brand-name {
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+/* Signed-out welcome with a faded backdrop: guilloche-style rings and the Gen6th mark,
+   both masked to fade toward the top-left so text sits on plain surface.
+   Worst case ink (14 percent) keeps body text above 11:1 and muted text above 6.5:1. */
+.welcome {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+.welcome::before,
+.welcome::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  animation: welcome-fade-in var(--motion-slow) var(--ease-standard) both;
+}
+.welcome::before {
+  background: repeating-radial-gradient(
+    circle at 92% 112%,
+    transparent 0 17px,
+    rgb(19 168 245 / 0.14) 17px 18px
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 92% 112%,
+    #000 0%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(circle at 92% 112%, #000 0%, transparent 70%);
+}
+.welcome::after {
+  background: url("/brand/gen6th-icon.svg") right -6% bottom -26% /
+    min(52%, 380px) no-repeat;
+  opacity: 0.14;
+  -webkit-mask-image: linear-gradient(135deg, transparent 10%, #000 70%);
+  mask-image: linear-gradient(135deg, transparent 10%, #000 70%);
+}
+@keyframes welcome-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.welcome-logo {
+  width: min(100%, 300px);
+  height: auto;
+}
+.welcome h2 {
+  margin: 0;
+  max-width: 28ch;
+  font-size: var(--text-title);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.welcome p {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--color-text);
+}
+.welcome .help {
+  color: var(--color-muted);
+}
+.welcome-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.welcome-steps li::before {
+  content: counter(step) ". ";
+  counter-increment: step;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.welcome-action {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-6);
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  .welcome::before,
+  .welcome::after {
+    display: none;
+  }
+}
+
+/* Booklet: Gen6th mark as a faded corner watermark on the record page, and contrast fixes. */
+:where(.booklet-dialog) .record-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url("/brand/gen6th-icon.svg") right -9% bottom -12% / 46% auto
+    no-repeat;
+  opacity: 0.07;
+  -webkit-mask-image: radial-gradient(
+    circle at 80% 85%,
+    #000 20%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(circle at 80% 85%, #000 20%, transparent 72%);
+}
+:where(.booklet-dialog) .identity-fields .field-note {
+  color: #44596b;
+}
+:where(.booklet-dialog) .empty-portrait {
+  color: #3f5566;
+}
+.booklet-dialog button {
+  border-color: #66808f;
+}
+@media (prefers-contrast: more), print {
+  :where(.booklet-dialog) .record-page::after {
+    display: none;
+  }
+}
+
+/* Public passport brand header. */
+.public-passport .public-logo {
+  width: min(100%, 280px);
+  height: auto;
+  margin: 0 0 var(--space-4);
+}
+
+/* Print: the shell is a dark screen theme; without this, light text prints on white. */
+@media print {
+  body:not(:has(.booklet-dialog[open])) {
+    background: #fff;
+    color: #000;
+  }
+  body:not(:has(.booklet-dialog[open]))
+    :is(.sidebar, .topbar, .console-footer, .skip-link) {
+    display: none;
+  }
+  body:not(:has(.booklet-dialog[open])) .studio {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+  body:not(:has(.booklet-dialog[open])) main {
+    overflow: visible;
+    max-width: none;
+  }
+}

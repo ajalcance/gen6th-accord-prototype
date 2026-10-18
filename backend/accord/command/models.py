@@ -1,0 +1,76 @@
+"""Spine cold-store models: the ``events`` history and the hash-chained ``audit_log``."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import JSON, BigInteger, DateTime, Index, String, Uuid
+from sqlalchemy.orm import Mapped, mapped_column
+
+from accord.db.base import Base
+
+
+class Event(Base):
+    """One envelope event (schema v1), flattened for queryability."""
+
+    __tablename__ = "events"
+
+    event_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    schema_v: Mapped[int] = mapped_column(default=1)
+    actor_type: Mapped[str] = mapped_column(String(16))
+    actor_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    sid: Mapped[str | None] = mapped_column(String(64), default=None)
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, default=None)
+    category: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    outcome: Mapped[str] = mapped_column(String(16))
+    severity: Mapped[str] = mapped_column(String(16))
+    resource_type: Mapped[str | None] = mapped_column(String(32), default=None)
+    resource_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    correlation_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    ip: Mapped[str | None] = mapped_column(String(45), default=None)
+    # Mirrors telemetry.envelope.SOURCE_SERVER. Written as a literal to keep this pure-data
+    # module free of the emitter's Redis/auth import chain; a test asserts the two agree.
+    source: Mapped[str] = mapped_column(String(16), default="server")
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_events_severity_ts", "severity", "ts"),
+        # Supports "show me everything a client reported" and the audit sealer's
+        # source-filtered scan. Must match migration 0002 — tests/test_migrations.py
+        # compares the migrated schema against these models and fails if they drift.
+        Index("ix_events_source_action", "source", "action"),
+        # Workspace backlog observation in migration 0003 avoids a global event scan.
+        Index("ix_events_tenant_category_source_ts", "tenant_id", "category", "source", "ts"),
+    )
+
+
+class AuditLog(Base):
+    """Tamper-evident, hash-chained audit record — the system of record.
+
+    Each entry's ``entry_hash`` = SHA-256 over its content **plus the previous entry's hash**, so
+    any edit/deletion/reorder breaks the chain (detectable by ``verify_chain``). Sealed by the
+    worker from the durable ``events`` cold store. Never purged.
+    """
+
+    __tablename__ = "audit_log"
+
+    seq: Mapped[int] = mapped_column(BigInteger(), primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(String(32), unique=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    actor_type: Mapped[str] = mapped_column(String(16))
+    actor_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, default=None, index=True)
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    outcome: Mapped[str] = mapped_column(String(16))
+    severity: Mapped[str] = mapped_column(String(16))
+    resource_type: Mapped[str | None] = mapped_column(String(32), default=None)
+    resource_id: Mapped[str | None] = mapped_column(String(64), default=None)
+    ip: Mapped[str | None] = mapped_column(String(45), default=None)
+    metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
+    compliance_tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    prev_hash: Mapped[str] = mapped_column(String(64))
+    entry_hash: Mapped[str] = mapped_column(String(64), unique=True)

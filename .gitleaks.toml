@@ -1,0 +1,24 @@
+# Gitleaks config — scans commits for secrets before they reach the repo.
+# CI:    python3 scripts/secret_scan.py --base <ref>  (canary-proven commit-range scan)
+# Local: the pre-commit hook scans what you stage at commit time.
+#
+# NO path-based exemptions. Exempting a path exempts every secret in those files forever, and
+# the canary in scripts/secret_scan.py refuses to run when any directory is exempt. It found the
+# ones this file used to have: every Markdown file under docs/ and the whole .env.example.
+# Only a VALUE that is obviously not a secret may be exempted, below.
+
+title = "Gen6th Accord gitleaks config"
+
+[extend]
+useDefault = true   # inherit gitleaks' built-in rules (AWS keys, tokens, PEMs, etc.)
+
+[allowlist]
+description = "Allow values that are placeholders, never real secrets"
+# Matched against the detected secret VALUE (gitleaks' default target), not the whole line or
+# file, so these can only exempt a value that itself contains the placeholder text.
+regexes = [
+  '''CHANGE_ME.*''',
+  '''openssl rand''',
+  '''placeholder''',
+  '''example\.com''',
+]

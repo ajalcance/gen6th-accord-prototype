@@ -1,0 +1,35 @@
+# CODEOWNERS — "review the meta, trust the features" (see docs/decisions/0004).
+#
+# In this AI-assisted workflow the agent writes feature code without a required human review.
+# These entries require a HUMAN code-owner approval ONLY for changes to the GUARDRAILS themselves —
+# CI, security rules, coverage guards, dependency manifests, and this file. Everything else
+# (backend/accord, frontend, docs) ships without a required review.
+#
+# Enforced by the branch ruleset (.github/rulesets/main.json, "require code owner review"), applied
+# with scripts/bootstrap-repo.sh. To require review on ALL changes instead, uncomment the catch-all.
+# *                            @ajalcance
+# https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# --- CI, security policy, and repo meta ---
+/.github/                      @ajalcance
+/.semgrep/                     @ajalcance
+/.gitleaks.toml                @ajalcance
+/.pre-commit-config.yaml       @ajalcance
+
+# --- Doc-consistency + repo-hardening guards ---
+/scripts/                      @ajalcance
+
+# --- Dependency manifests (supply-chain surface) ---
+/backend/pyproject.toml        @ajalcance
+/backend/requirements.txt      @ajalcance
+/backend/requirements-dev.txt  @ajalcance
+/frontend/package.json          @ajalcance
+/frontend/package-lock.json     @ajalcance
+/docs-site/package.json         @ajalcance
+/docs-site/package-lock.json    @ajalcance
+
+# --- Compliance-spine decision lists (the four coverage guards read these) ---
+/backend/accord/telemetry/registry.py  @ajalcance
+/backend/accord/command/rules.py       @ajalcance
+/backend/accord/command/controls.py    @ajalcance
+/backend/accord/command/audit.py       @ajalcance

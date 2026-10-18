@@ -1,0 +1,62 @@
+# Deploy — Gen6th Accord
+
+Single-host Docker Compose stack: **Caddy** (TLS + reverse proxy) → **backend** + **frontend**, with **Postgres**, **Redis** + a compliance-spine **worker**, and a one-shot **migrate** step.
+
+## Production: deploy only signed images
+
+Production **never builds on the host** — it runs the exact images CI built and signed (cosign
+keyless) via `.github/workflows/release.yml`. So what runs is provably what CI produced, not
+whatever source happened to be on the box.
+
+Builds set `provenance: false`, so each push is a **single manifest** and the signed digest is
+unambiguously the digest of the image that runs (not an OCI index wrapping it).
+
+```bash
+# 1. Cut a release — CI builds, pushes to GHCR and signs each image (tag must be on the default branch).
+git tag v0.1.0 && git push origin v0.1.0
+
+# 2. On the server: real secrets in ../.env (copy from ../.env.example). NEVER commit it.
+cp ../.env.example ../.env && $EDITOR ../.env   # SECRET_KEY, POSTGRES_*, ENVIRONMENT=production, and
+                                                # BACKEND_IMAGE/FRONTEND_IMAGE=ghcr.io/...@sha256:<digest>
+
+# 3. Fetch the signed evidence for the tag, then verify BEFORE running anything (fail-closed).
+gh release download v0.1.0 --pattern 'release-evidence.*'
+./verify.sh --tag v0.1.0
+
+# 4. Start the base stack ONLY (no build override); migrations run before the backend.
+docker compose -f docker-compose.yml --env-file ../.env up -d
+docker compose -f docker-compose.yml ps
+curl -k https://accord.gen6th.com/health
+```
+
+Pin `BACKEND_IMAGE`/`FRONTEND_IMAGE` to the immutable `@sha256:` **digest** (not a moving tag) so a
+re-pushed tag can't swap the artifact under you. `./verify.sh` refuses anything not signed by this
+repo's release workflow.
+
+`verify.sh` takes the tag rather than a list of images, and reads the digests out of the signed
+evidence. An operator who types a digest by hand can type one the evidence does not mention, and
+then every check just performed covered a different artifact from the one about to run.
+
+It also refuses a release whose **production-readiness verdict was not clean at build time**.
+That verdict is recorded inside the signed document rather than re-derived here, because a scan
+run on this host would describe whatever was last pulled — not the release. A readiness check
+against the wrong tree is worse than none, because it looks like a control.
+
+## Local development
+
+`docker-compose.override.yml` (auto-merged) builds from source instead — no registry needed:
+
+```bash
+cp ../.env.example ../.env            # BACKEND_IMAGE defaults to a local build tag
+docker compose --env-file ../.env up -d --build
+```
+
+## Notes
+
+- **Secrets** live only in `../.env` (gitignored) — never in the compose file or the repo.
+- `Caddyfile` uses `tls internal` (self-signed). For a real domain, remove that line for
+  automatic Let's Encrypt.
+- Containers run **read-only** and **non-root** with `no-new-privileges`.
+- The **worker** (`accord.command.worker`) drains the Redis telemetry stream into the
+  Postgres cold store and seals the audit chain. It restarts on failure; if it is down, requests are
+  unaffected (telemetry is fail-open) — only ingest/sealing pauses.

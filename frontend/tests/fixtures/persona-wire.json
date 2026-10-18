@@ -1,0 +1,232 @@
+{
+  "save": {
+    "request_id": "00000000-0000-4000-8000-000000000010",
+    "content": {
+      "name": "Fictional Nova",
+      "biography": "Fictional editorial character.",
+      "human_contribution": "Original fictional concept.",
+      "ai_disclosure": "Synthetic contract fixture."
+    },
+    "persona_id": null,
+    "expected_revision": 0,
+    "photo": {
+      "action": "attach",
+      "upload_id": "00000000-0000-4000-8000-000000000090"
+    }
+  },
+  "version": {
+    "persona_id": "00000000-0000-4000-8000-000000000001",
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "revision": 1,
+    "creator_ref": "creator-a",
+    "recorded_at": "2026-10-02T04:00:00Z",
+    "content": {
+      "name": "Fictional Nova",
+      "biography": "Fictional editorial character.",
+      "human_contribution": "Original fictional concept.",
+      "ai_disclosure": "Synthetic contract fixture."
+    }
+  },
+  "reviewCommand": {
+    "request_id": "00000000-0000-4000-8000-000000000011",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "expected_previous_id": null,
+    "decision": "approved",
+    "statement": "Fictional review; no legal determination."
+  },
+  "review": {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "ordinal": 1,
+    "reviewer_ref": "reviewer-a",
+    "decision": "approved",
+    "statement": "Fictional review; no legal determination.",
+    "recorded_at": "2026-10-02T04:01:00Z",
+    "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "offer": {
+    "request_id": "00000000-0000-4000-8000-000000000012",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "review_id": "00000000-0000-4000-8000-000000000004",
+    "scope": {
+      "name": "Fictional campaign",
+      "recipient_ref": "recipient-a",
+      "asset_ids": ["00000000-0000-4000-8000-000000000005"],
+      "purpose": "Fictional editorial use.",
+      "conditions": "No sublicensing.",
+      "starts_at": "2026-10-02T04:00:00Z",
+      "ends_at": "2026-10-03T04:00:00Z"
+    }
+  },
+  "campaign": {
+    "id": "00000000-0000-4000-8000-000000000006",
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "review_id": "00000000-0000-4000-8000-000000000004",
+    "owner_ref": "creator-a",
+    "scope": {
+      "name": "Fictional campaign",
+      "recipient_ref": "recipient-a",
+      "asset_ids": ["00000000-0000-4000-8000-000000000005"],
+      "purpose": "Fictional editorial use.",
+      "conditions": "No sublicensing.",
+      "starts_at": "2026-10-02T04:00:00Z",
+      "ends_at": "2026-10-03T04:00:00Z"
+    },
+    "assets": [
+      {
+        "id": "00000000-0000-4000-8000-000000000005",
+        "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "label": "Fictional asset"
+      }
+    ],
+    "recorded_at": "2026-10-02T04:02:00Z",
+    "event_id": "cccccccccccccccccccccccccccccccc"
+  },
+  "decisionCommand": {
+    "request_id": "00000000-0000-4000-8000-000000000013",
+    "campaign_id": "00000000-0000-4000-8000-000000000006",
+    "expected_previous_id": null,
+    "decision": "accepted",
+    "statement": "Recipient accepts this fictional scope."
+  },
+  "decision": {
+    "id": "00000000-0000-4000-8000-000000000007",
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "campaign_id": "00000000-0000-4000-8000-000000000006",
+    "ordinal": 1,
+    "actor_ref": "recipient-a",
+    "decision": "accepted",
+    "statement": "Recipient accepts this fictional scope.",
+    "recorded_at": "2026-10-02T04:03:00Z",
+    "event_id": "dddddddddddddddddddddddddddddddd"
+  },
+  "status": {
+    "receipt": {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "workspace_id": "00000000-0000-4000-8000-000000000002",
+      "version_id": "00000000-0000-4000-8000-000000000003",
+      "review_id": "00000000-0000-4000-8000-000000000004",
+      "owner_ref": "creator-a",
+      "scope": {
+        "name": "Fictional campaign",
+        "recipient_ref": "recipient-a",
+        "asset_ids": ["00000000-0000-4000-8000-000000000005"],
+        "purpose": "Fictional editorial use.",
+        "conditions": "No sublicensing.",
+        "starts_at": "2026-10-02T04:00:00Z",
+        "ends_at": "2026-10-03T04:00:00Z"
+      },
+      "assets": [
+        {
+          "id": "00000000-0000-4000-8000-000000000005",
+          "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "label": "Fictional asset"
+        }
+      ],
+      "recorded_at": "2026-10-02T04:02:00Z",
+      "event_id": "cccccccccccccccccccccccccccccccc"
+    },
+    "latest_decision": {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "workspace_id": "00000000-0000-4000-8000-000000000002",
+      "campaign_id": "00000000-0000-4000-8000-000000000006",
+      "ordinal": 1,
+      "actor_ref": "recipient-a",
+      "decision": "accepted",
+      "statement": "Recipient accepts this fictional scope.",
+      "recorded_at": "2026-10-02T04:03:00Z",
+      "event_id": "dddddddddddddddddddddddddddddddd"
+    },
+    "evaluated_at": "2026-10-02T04:04:00Z",
+    "blocking_reasons": [],
+    "eligible_for_use": true
+  },
+  "galleryQuery": {
+    "after_persona_id": null,
+    "limit": 20,
+    "search": ""
+  },
+  "gallery": {
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "items": [
+      {
+        "persona_id": "00000000-0000-4000-8000-000000000001",
+        "workspace_id": "00000000-0000-4000-8000-000000000002",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "revision": 1,
+        "creator_ref": "creator-a",
+        "recorded_at": "2026-10-02T04:00:00Z",
+        "content": {
+          "name": "Fictional Nova",
+          "biography": "Fictional editorial character.",
+          "human_contribution": "Original fictional concept.",
+          "ai_disclosure": "Synthetic contract fixture."
+        }
+      }
+    ],
+    "next_after_persona_id": null
+  },
+  "reviewHistory": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000004",
+        "workspace_id": "00000000-0000-4000-8000-000000000002",
+        "version_id": "00000000-0000-4000-8000-000000000003",
+        "ordinal": 1,
+        "reviewer_ref": "reviewer-a",
+        "decision": "approved",
+        "statement": "Fictional review; no legal determination.",
+        "recorded_at": "2026-10-02T04:01:00Z",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "next_before_ordinal": null
+  },
+  "campaignHistory": {
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000007",
+        "workspace_id": "00000000-0000-4000-8000-000000000002",
+        "campaign_id": "00000000-0000-4000-8000-000000000006",
+        "ordinal": 1,
+        "actor_ref": "recipient-a",
+        "decision": "accepted",
+        "statement": "Recipient accepts this fictional scope.",
+        "recorded_at": "2026-10-02T04:03:00Z",
+        "event_id": "dddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "next_before_ordinal": null
+  },
+  "evidenceStatus": {
+    "id": "00000000-0000-4000-8000-000000000008",
+    "workspace_id": "00000000-0000-4000-8000-000000000002",
+    "version_id": "00000000-0000-4000-8000-000000000003",
+    "media_type": "text/plain",
+    "byte_length": 48,
+    "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "recorded_at": "2026-10-02T04:00:00Z",
+    "expires_at": "2026-10-09T04:00:00Z",
+    "state": "quarantined"
+  },
+  "workflowEvidence": {
+    "anchor": {
+      "record_id": "00000000-0000-4000-8000-000000000004",
+      "workspace_id": "00000000-0000-4000-8000-000000000002",
+      "version_id": "00000000-0000-4000-8000-000000000003",
+      "action": "persona.review_recorded",
+      "actor_ref": "reviewer-a",
+      "recorded_at": "2026-10-02T04:01:00Z",
+      "write_request_id": "00000000-0000-4000-8000-000000000011",
+      "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "observation_request_id": "00000000-0000-4000-8000-000000000014",
+    "cold_event_present": true,
+    "audit_state": "pending",
+    "audit_sequence": null,
+    "audit_entry_hash": null
+  }
+}

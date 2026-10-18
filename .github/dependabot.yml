@@ -1,0 +1,201 @@
+# Dependabot — automated dependency & GitHub Actions updates (supply-chain hygiene).
+# Targets the repo's default branch. Directories without a manifest are simply no-ops
+# until they exist, so entries for optional modules are safe to keep.
+#
+# Grouping policy: minor/patch bumps are grouped per ecosystem to cut noise, and MAJOR
+# bumps are grouped into a single separate PR per ecosystem. A major bump usually needs a
+# deliberate migration (a major TypeScript/ESLint bump can fail the gate until code is
+# updated), so majors stay visible but land as one reviewable PR instead of flooding a
+# brand-new repo with several red ones.
+#
+# The `docker` entries are load-bearing: base images are pinned by DIGEST, and a pinned
+# digest that is never updated silently rots into an unpatched image. Pinning without
+# Dependabot would be worse than not pinning at all.
+#
+# No `target-branch` is set anywhere here, deliberately: the project is trunk-based
+# (docs/decisions/0005-trunk-based-branching.md), so the default branch IS the integration
+# branch and Dependabot's default is correct. If you ever reintroduce a long-lived branch,
+# this file is one of the places that must learn about it — it silently assumed the wrong
+# thing last time precisely because it isn't a file anyone thinks of as branching-related.
+#
+# `cooldown` is not hygiene, it is the premise an argument already rests on. CI waives the
+# sensitive-path label for Dependabot when a diff touches only manifests, and that waiver
+# assumes the version has been public long enough for a malicious publish to be noticed.
+# Without a cooldown, a version published an hour ago can be proposed immediately — down the
+# shortest automated path to merge in the repository. Encode the premise an argument rests
+# on, or the argument is decoration. tests/guards/test_workflow_invariants.py fails if any
+# ecosystem lacks one or sets it below the 7 days the waiver assumes.
+version: 2
+updates:
+  # Approved private backport: keep its upstream dependency watched.
+  - package-ecosystem: npm
+    directory: "/vendor/braces/source"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci"]
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # The scanners that judge a pull request. Pinned in requirements-ci.txt at the repo root,
+  # and gated by the meta-guard — so a bump here arrives as a PR that needs the owner's label.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ci", "guardrail-change"]
+
+  - package-ecosystem: pip
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "backend"]
+    groups:
+      backend-minor-patch:
+        update-types: ["minor", "patch"]
+      backend-major:
+        update-types: ["major"]
+
+  # The trust services (Go). No dependencies yet; this keeps them watched from the first one.
+  - package-ecosystem: gomod
+    directory: "/trust"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "go"]
+
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "frontend"]
+    groups:
+      frontend-minor-patch:
+        update-types: ["minor", "patch"]
+    # Major bumps of the tooling that GATES the build (typescript 5->7, eslint 9->10,
+    # jsdom 26->29) fail the frontend job until the code is migrated, and grouping them
+    # does not stop them returning every week — a fresh repo just accumulates red PRs,
+    # which trains the adopter to ignore Dependabot. Upgrade these deliberately instead:
+    #   npm i -D typescript@latest && npm run lint && npx tsc --noEmit && npm test
+    # Runtime dependencies (next, react, react-dom) still receive major bumps.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prettier"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: "/docs-site"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docs-site"]
+    groups:
+      docs-site-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore: # same rationale as frontend
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prettier"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/*"
+        update-types: ["version-update:semver-major"]
+
+  # --- Base images (pinned by digest — see the Dockerfiles) ---
+  # Runtime versions are pinned deliberately: Python 3.12 (backend, CI runners, devcontainer)
+  # and Node 22 LTS (frontend gate fails on 23+). Dependabot keeps refreshing the DIGEST of the
+  # pinned tag — the security patches — but never proposes a new runtime line. A runtime upgrade
+  # is a decision taken in its own PR across Dockerfile, CI and toolchain together, not a
+  # weekly bump in one directory that leaves the others behind.
+  - package-ecosystem: docker
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
+  - package-ecosystem: docker
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+
+  # The PostgreSQL the backend tests run against (never built; conftest reads its FROM line).
+  # Digest refreshes arrive as PRs; a new major is taken with production, in its own PR.
+  - package-ecosystem: docker
+    directory: "/backend/tests/postgres"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    directory: "/.devcontainer"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "devcontainers/python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

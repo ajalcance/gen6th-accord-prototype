@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Gen6th icon — full colour</title>
+  <desc id="desc">Full-colour Gen6th icon on a transparent background.</desc>
+  <defs>
+    <linearGradient id="gen6th-gradient" x1="15%" y1="92%" x2="86%" y2="10%">
+      <stop offset="0" stop-color="#743CFF"/>
+      <stop offset="0.38" stop-color="#2E5BFF"/>
+      <stop offset="0.72" stop-color="#13A8F5"/>
+      <stop offset="1" stop-color="#14D9ED"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#gen6th-gradient)">
+    <path d="M328 47 C286 76 241 111 198 147 C153 184 116 220 94 256 C72 293 73 333 94 357 C113 379 148 387 185 374 C213 364 238 347 260 328 C234 342 208 351 184 349 C153 347 132 333 128 312 C123 287 139 260 162 232 C206 178 269 108 328 47 Z"/>
+    <path d="M240 196 C265 181 294 174 319 181 C353 190 377 216 382 251 C389 301 361 356 315 394 C269 432 212 449 159 438 C122 430 93 411 76 385 C94 397 117 403 142 401 C190 399 237 371 270 331 C294 302 307 274 303 250 C300 228 280 211 240 196 Z"/>
+    <path d="M368 72 C374 93 387 106 409 113 C388 120 375 133 368 155 C361 134 348 120 326 113 C348 106 361 93 368 72 Z"/>
+  </g>
+</svg>

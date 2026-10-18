@@ -1,0 +1,573 @@
+# ==============================================================================
+# CI — quality + security gate
+# ==============================================================================
+# Runs on every PR, and on pushes to the default branch only (see the cost note below).
+# Path-filtered so a docs-only change doesn't run backend/frontend suites; jobs skip when
+# their paths are absent — and a skipped job costs nothing.
+#
+# Actions are pinned to full commit SHAs (with a version comment); Dependabot
+# (github-actions) keeps them current. `ci-complete` is the single required check.
+# ==============================================================================
+
+name: CI
+
+# COST: GitHub bills per JOB, rounded up to a full minute — job COUNT is the cost driver,
+# not job duration. A PR run and the push run that follows the merge test the same tree, so
+# `push` is limited to the default branch (post-merge verification); PRs are gated by the
+# pull_request run. This roughly halves total runs.
+# `types:` is load-bearing, not boilerplate. The meta-guard reads the owner's labels from the
+# event payload and the declaration guard reads the PR body the same way — and a re-run replays
+# the ORIGINAL payload. Without `labeled`/`edited`, a label applied after the run and a body
+# written after the run never took effect, while the check that appeared green had evaluated
+# the absent labels and the empty body.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+  push:
+    branches: [main]
+
+# Cancel a superseded PR run; never cancel a run on the default branch. A cancelled run reports
+# a non-success result, so cancelling on `push` lets a main commit carry a cancelled gate — and
+# that is the tree a release tag is cut from.
+#
+# Consequence worth knowing: applying a label fires a new run that cancels the current one, so a
+# check rollup shows a FAILURE from the cancelled run beside the live one. Evaluate checks by
+# completion time, not by presence.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read # check out the code; nothing in CI writes to the repository
+  pull-requests: read # paths-filter reads the PR's changed files through the API
+
+# Every job has an explicit `name:` equal to its id (zizmor anonymous-definition). The name is
+# the check context GitHub reports, and `ci-complete` is the one the branch ruleset requires,
+# so a name that differed from the id would silently stop satisfying the ruleset.
+jobs:
+  # ---- Detect which parts of the repo changed -----------------------------
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      trust: ${{ steps.filter.outputs.trust }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docs: ${{ steps.filter.outputs.docs }}
+      code: ${{ steps.filter.outputs.code }}
+      changelog: ${{ steps.filter.outputs.changelog }}
+    steps:
+      # paths-filter reads the diff through the API on a pull_request, but through GIT on a
+      # push — where it needs `github.event.before` to be present. A shallow clone sends it
+      # to `git fetch`, which cannot authenticate once the credential is gone. The failure
+      # is invisible on a PR and on the root commit, so it first appears at the very first
+      # merge, and takes every gate behind this job with it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            trust:
+              - 'trust/**'
+            frontend:
+              - 'frontend/**'
+            # Must include the directory docs-site/lib/docs.ts publishes (DOCS_DIR). It named two
+            # directories that do not exist while the real one, docs/public/, went unbuilt on a
+            # docs-only change — tests/guards/test_workflow_invariants.py now derives this.
+            docs:
+              - 'docs-site/**'
+              - 'docs/public/**'
+            code:
+              - 'backend/**'
+              - 'trust/**'
+              - 'frontend/src/**'
+            changelog:
+              - 'CHANGELOG.md'
+
+  # ---- Secret + hygiene scanning (always) ---------------------------------
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      # The gitleaks HOOK is skipped here on purpose. Its command is `gitleaks protect --staged`,
+      # which is right on a laptop at commit time and blind on a clean CI checkout, where nothing
+      # is staged: it read no input and passed every run. The step after this one is the real CI
+      # secret scan. Leaving the hook in would print a green "Detect hardcoded secrets" line
+      # that checked nothing — a claim this job must not make.
+      - name: Run pre-commit hooks (detect-private-key, hygiene)
+        env:
+          SKIP: gitleaks
+        run: |
+          pip install --require-hashes -c requirements-ci.txt pre-commit
+          pre-commit run --all-files --show-diff-on-failure
+
+      # Secret scan over the COMMITS this change adds, proven on every run by a canary: fresh
+      # fake tokens planted in every tracked directory must all be found before the real scan's
+      # "clean" counts (scripts/secret_scan.py). Pinned by version AND checksum. The base comes
+      # from GitHub, through the environment: the PR's base commit, or the push's `before`. An
+      # empty or unresolvable base is refused, never read as HEAD..HEAD.
+      - name: Secret scan over commits (canary-proven)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          SCAN_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum --check --status
+          tar -xzf "$tarball" gitleaks
+          make secret-scan BASE="$SCAN_BASE" GITLEAKS="$PWD/gitleaks"
+          rm -f gitleaks "$tarball"
+
+  # ---- SAST: dangerous-ops ruleset + Semgrep security audit (always) ------
+  sast:
+    name: sast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the community scan compares against the base commit
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install Semgrep
+        run: pip install --require-hashes -c requirements-ci.txt semgrep
+      - name: Dangerous-operations ruleset (Layer 1 — BLOCKING)
+        run: semgrep scan --config .semgrep/dangerous-ops.yml --error --metrics=off
+      # Community rules — diff-aware and BLOCKING (ADR-0018). This step used to run the whole
+      # repository with `|| true` and discard the output: it could block nothing and nobody read
+      # it. Now it fails on findings NEW since the base commit, so a remote ruleset update cannot
+      # turn old code red, and the SARIF report is kept as an artifact. The whole repository was
+      # triaged on 2026-09-24 (141 rules, 176 files, 0 findings), so there is no backlog hidden
+      # by the baseline. p/secrets overlaps gitleaks deliberately: rule 1 of ADR-0018 — name
+      # what a check catches before removing it.
+      - name: Semgrep security audit (community rules — diff-aware, BLOCKING)
+        env:
+          SEMGREP_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          test -n "$SEMGREP_BASE" || { echo "::error::no base commit to diff against"; exit 1; }
+          semgrep scan --config "p/security-audit" --config "p/secrets" --metrics=off \
+            --baseline-commit "$SEMGREP_BASE" --error --sarif-output=semgrep-community.sarif
+      - name: Keep the Semgrep community report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: semgrep-community-sarif
+          path: semgrep-community.sarif
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---- Backend: lint + type + test + Bandit (only if backend/ changed) ----
+  backend:
+    name: backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Format check (black)
+        run: black --check .
+      - name: Type check (mypy)
+        run: mypy .
+      # The identical string `make backend` runs. See the note in the Makefile: -x is a
+      # prefix match, so `-x tests` excluded nothing, and `./.venv` (absent here, present
+      # for every developer) must be named or the local mirror of this job cannot pass.
+      - name: Security (bandit)
+        run: bandit -r . -ll -q -x ./tests,./.venv
+      - name: Supply-chain audit (pip-audit)
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
+      - name: Tests (pytest + coverage floor)
+        run: pytest -q --cov
+
+  # ---- Trust services (Go): the code that signs and verifies (only if trust/ changed) ----
+  # Mirrors `make trust` exactly (tests/guards/test_workflow_invariants.py). The Go version comes
+  # from trust/go.mod alone, and GOTOOLCHAIN=local forbids go from fetching a different one.
+  trust:
+    name: trust
+    needs: changes
+    if: needs.changes.outputs.trust == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: trust
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No dependency cache: a cache is state carried between runs, and a poisoned one is read
+      # by the next. The module has no dependencies yet, so there is nothing to gain from one.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: trust/go.mod
+          cache: false
+      # golangci-lint pinned by version AND its published checksum; govulncheck by module
+      # version, which the Go checksum database verifies. Both clear the 7-day cooldown.
+      - name: Install pinned Go tools
+        env:
+          GOLANGCI_LINT_VERSION: 2.13.2
+          GOLANGCI_LINT_SHA256: 2277d43b98ec0054280f2ac26b53268bae97682444678a59a657dd565da021d6
+          GOVULNCHECK_VERSION: v1.8.0
+        run: |
+          name="golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64"
+          curl -fsSLO "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/${name}.tar.gz"
+          echo "${GOLANGCI_LINT_SHA256}  ${name}.tar.gz" | sha256sum --check --status
+          tar -xzf "${name}.tar.gz"
+          mkdir -p "$RUNNER_TEMP/bin"
+          mv "${name}/golangci-lint" "$RUNNER_TEMP/bin/"
+          rm -rf "${name}" "${name}.tar.gz"
+          GOBIN="$RUNNER_TEMP/bin" go install "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Module checksums (go mod verify)
+        run: go mod verify
+      - name: Vet (go vet)
+        run: go vet ./...
+      - name: Lint, format and security (golangci-lint with gofmt and gosec)
+        run: golangci-lint run ./...
+      - name: Known vulnerabilities (govulncheck)
+        run: govulncheck ./...
+      - name: Tests (go test -race)
+        run: go test -race ./...
+
+  # ---- Frontend: lint + type + test (only if frontend/ changed) -----------
+  frontend:
+    name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint (eslint)
+        run: npm run lint
+      - name: Format check (prettier)
+        run: npx prettier --check .
+      - name: Type check (tsc)
+        run: npx tsc --noEmit
+      # The whole tree, dev dependencies included. The build tools run here, with this checkout,
+      # and on every developer machine. This used to pass --omit=dev, and its comment said
+      # Dependabot and a daily self-test covered dev tooling. Neither existed: Dependabot alerts
+      # were off and nothing is scheduled. Three high advisories sat unseen until 2026-09-25.
+      - name: Supply-chain audit (npm audit, full tree)
+        run: npm audit --audit-level=high
+      - name: Tests
+        run: npm test --if-present
+      # Must mirror `make frontend` exactly — a production build break is otherwise only
+      # caught post-merge at image-build time (or never). Keep this list in sync.
+      - name: Production build (next build)
+        run: npm run build
+      - name: Client bundle-size budget
+        run: npm run bundle-size
+
+  # ---- Docs site: lint + test + build (only if docs-site/ or docs/public/ changed) ----
+  docs:
+    name: docs
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # Must mirror `make docs-site` exactly. Keep this list in sync.
+      - name: Lint (eslint)
+        run: npm run lint
+      - name: Format check (prettier)
+        run: npx prettier --check .
+      - name: Supply-chain audit (npm audit, full tree — see the frontend job)
+        run: npm audit --audit-level=high
+      # The public-only rule's gate: the real lib/docs.ts must publish docs/public/ and nothing
+      # else, refusing `..` slugs and symlinks. No --if-present: a vanished harness must fail.
+      # The tests also read the rest of docs/, but only to count internal documents; what the
+      # site publishes can change only through docs-site/ or docs/public/, which the filter covers.
+      - name: Tests (vitest, public-only rule)
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  # ---- Static guards, batched (always; blocking) ---------------------------
+  # doc-guards, the dependency pin guard, the meta-guard and the docs-sync nudge were four
+  # separate jobs, each finishing in well under 10 seconds but each billing a FULL MINUTE.
+  # Batched into one job they cost one minute instead of four, with identical coverage.
+  # `changes` stays separate on purpose: it is the dependency other jobs fan out from, so a
+  # doc failure here must not skip backend/frontend/docs and cost you their signal.
+  static:
+    name: static
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Keeps its credential, unlike every other job here: the step below runs an explicit
+      # `git fetch`, which cannot authenticate against a private repository without it. The
+      # rule, asserted by tests/guards/test_workflow_invariants.py, is that a job may drop the
+      # credential OR fetch, never neither-nor: dropping it from a fetching job fails closed on
+      # a private repo and passes on a public one, which is the worst of both.
+      # zizmor flags this checkout (artipacked) because it keeps its credential. That is the
+      # deliberate trade described above, reviewed as an exception on 2026-09-24 (ADR-0018).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: # zizmor: ignore[artipacked]
+          fetch-depth: 0 # every guard in this job diffs against the base branch
+
+      # Fetched ONCE, up front. Three guards below diff against this ref, and they must not
+      # each discover for themselves whether it is present — the declaration guard treats an
+      # unreadable diff as a hard failure, which is only reasonable if the ref is really here.
+      - name: Fetch the base branch the guards diff against
+        if: github.event_name == 'pull_request'
+        run: git fetch -q --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # Workflow linting. Pinned by version AND verified by checksum — the same supply-chain
+      # discipline applied to every other dependency here. Catches invalid `needs:` references,
+      # bad `${{ }}` expressions and deprecated action inputs that YAML validity alone misses.
+      - name: Lint GitHub Actions workflows (actionlint)
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum --check --status
+          tar -xzf "$tarball" actionlint
+          ./actionlint -color
+          rm -f actionlint "$tarball"
+
+      # Workflow SECURITY audit (ADR-0018): template injection, credential persistence,
+      # impostor commits, known-vulnerable actions. The CI config is itself attack surface. Pinned
+      # by version and by the SHA-256 GitHub recorded for the release asset (zizmor publishes no
+      # checksum file). Runs online with the job's read-only token for the audits that need the API.
+      - name: Audit GitHub Actions workflows (zizmor)
+        env:
+          ZIZMOR_VERSION: 1.30.1
+          ZIZMOR_SHA256: e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tarball="zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLO "https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}/${tarball}"
+          echo "${ZIZMOR_SHA256}  ${tarball}" | sha256sum --check --status
+          tar -xzf "$tarball" zizmor
+          # The strictest persona: every audit, no suppression by confidence. The two reviewed
+          # exceptions are inline ignores that the meta-guard counts as suppressions.
+          # Without a token zizmor silently runs OFFLINE and skips the audits that resolve pins
+          # against the network (a wrong version comment, an impostor commit). Those found real
+          # defects on first run, so a run that could not perform them is refused, not passed.
+          test -n "${GH_TOKEN:-}" || { echo "::error::no token: zizmor would skip its online audits"; exit 2; }
+          set -o pipefail
+          ./zizmor --format plain --persona auditor .github/workflows 2>&1 | tee zizmor.log
+          if grep -qi "offline mode" zizmor.log; then
+            echo "::error::zizmor ran in offline mode; its online audits did not run"
+            exit 2
+          fi
+          rm -f zizmor "$tarball" zizmor.log
+
+      # Dockerfile linting (ADR-0018). Pinned by version and by the published checksum. The file
+      # list comes from git and an empty list fails: a linter handed no input passes anything.
+      - name: Lint Dockerfiles (hadolint)
+        env:
+          HADOLINT_VERSION: 2.15.1
+          HADOLINT_SHA256: c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507
+        run: |
+          curl -fsSL -o hadolint "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-linux-x86_64"
+          echo "${HADOLINT_SHA256}  hadolint" | sha256sum --check --status
+          chmod +x hadolint
+          mapfile -d '' dockerfiles < <(git ls-files -z -- '*Dockerfile*')
+          if [ "${#dockerfiles[@]}" -eq 0 ]; then echo "::error::hadolint found no Dockerfiles"; exit 1; fi
+          echo "hadolint: ${#dockerfiles[@]} Dockerfile(s): ${dockerfiles[*]}"
+          ./hadolint --failure-threshold info "${dockerfiles[@]}"
+          rm -f hadolint
+
+      # Negative tests proving each guard CAN fail. Runs BEFORE the guards themselves: if a
+      # guard has silently stopped working, the fault tests say so by name, rather than every
+      # downstream check quietly passing on an input it never really inspected.
+      # The scanner lock is only a lock if pip verifies it (ADR-0018). Plant a canary first: move
+      # one package to another version while keeping its hashes, and require pip to REFUSE it,
+      # naming hashes. If pip ever stopped enforcing hashes through a constraints file, this
+      # step fails, instead of every install below quietly trusting unverified downloads.
+      - name: Prove the scanner lock's hashes are enforced (canary)
+        run: |
+          canary="$RUNNER_TEMP/requirements-ci-tampered.txt"
+          sed -E 's/^pyyaml==[^ ]+/pyyaml==6.0.1/' requirements-ci.txt > "$canary"
+          if cmp -s requirements-ci.txt "$canary"; then
+            echo "::error::the canary changed nothing — it cannot prove anything"; exit 2
+          fi
+          if pip install --dry-run --require-hashes -c "$canary" pyyaml > "$RUNNER_TEMP/canary.log" 2>&1; then
+            cat "$RUNNER_TEMP/canary.log"
+            echo "::error::pip installed a package whose hashes do not match the lock"; exit 2
+          fi
+          cat "$RUNNER_TEMP/canary.log"
+          grep -qi "hash" "$RUNNER_TEMP/canary.log" || {
+            echo "::error::pip refused the canary, but not over its hashes — this proves nothing"
+            exit 2
+          }
+          echo "canary: a tampered lock was refused over its hashes; the real lock is enforced"
+
+      - name: Guard fault tests
+        run: |
+          pip install -q --require-hashes -c requirements-ci.txt pyyaml pytest
+          python3 -m pytest tests/guards -q
+
+      # The Definition of Done, made checkable. Skipped for bot authors: a Dependabot PR body is
+      # machine-generated and its memory impact is genuinely nil, so requiring a declaration there
+      # would train everyone to paste one — and a declaration nobody reads is worse than none.
+      # The author type comes from GitHub, not from the PR content, so it cannot be spoofed.
+      - name: PR memory-impact declaration matches the diff
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Via the environment, never interpolated into the script: a PR body is untrusted input,
+          # and zizmor flags any expression expanded inside a run block (template injection).
+          printf '%s' "$PR_BODY" > /tmp/pr-body.md
+          python3 scripts/pr_declaration.py --body-file /tmp/pr-body.md \
+            --base "origin/${BASE_REF}"
+
+      # ONE list, in the Makefile. This job used to relist each gate script by hand beside
+      # the Makefile's own list, and two lists mean a gate can be added to one and forgotten
+      # in the other — a gate that joins the local suite and then does not run in CI is
+      # indistinguishable from one that runs and passes. `make policy` covers:
+      #   guard coverage · unicode hazards · registry honesty · as-built + stale refs ·
+      #   production-readiness register · standards honesty · dependency pins
+      # tests/guards/test_workflow_invariants.py fails if this job ever calls one of those
+      # scripts directly again.
+      - name: Repository policy gates (make policy)
+        run: make policy
+
+      # The guards, their fault tests and the session hooks — the trees `make backend` does
+      # not reach. Same config file locally and here, so the two cannot disagree about what
+      # counts as clean.
+      - name: Lint the harness (make harness)
+        run: |
+          # Constrained by backend/requirements-dev.txt, which already pins ruff and black
+          # for `make backend`. One source of truth for the versions: a second pin here
+          # would drift, and then "clean" would mean two different things.
+          pip install -q -c backend/requirements-dev.txt ruff black
+          ruff check --config ruff-harness.toml scripts tests/guards .claude/hooks
+          black --check -l 100 scripts tests/guards .claude/hooks
+
+      # An agent trying to make CI green can add # noqa / # type: ignore / # nosemgrep /
+      # # pragma: no cover, or change code without a test. This diff-based check fails on net-new
+      # suppressions or missing tests. Escape hatches are explicit PR labels a human must apply —
+      # so an override is always a conscious act, never silent. See docs/decisions/0004.
+      - name: Meta-guard (suppressions, tests, guard files, sensitive paths, exemptions)
+        if: github.event_name == 'pull_request'
+        env:
+          ALLOW_SUPPRESSIONS: ${{ contains(github.event.pull_request.labels.*.name, 'allow-suppressions') }}
+          ALLOW_MISSING_TESTS: ${{ contains(github.event.pull_request.labels.*.name, 'no-tests-needed') }}
+          ALLOW_GUARDRAIL_CHANGE: ${{ contains(github.event.pull_request.labels.*.name, 'guardrail-change') }}
+          ALLOW_SENSITIVE: ${{ contains(github.event.pull_request.labels.*.name, 'sensitive-change-approved') }}
+          ALLOW_EXEMPTIONS: ${{ contains(github.event.pull_request.labels.*.name, 'allow-exemptions') }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # An array, not a string: an unquoted "$flags" relies on word-splitting (SC2086) and
+          # would break the moment a flag ever contained a space.
+          flags=()
+          if [ "$ALLOW_SUPPRESSIONS" = "true" ]; then flags+=(--allow-suppressions); fi
+          if [ "$ALLOW_MISSING_TESTS" = "true" ]; then flags+=(--allow-missing-tests); fi
+          if [ "$ALLOW_GUARDRAIL_CHANGE" = "true" ]; then flags+=(--allow-guardrail-change); fi
+          if [ "$ALLOW_SENSITIVE" = "true" ]; then flags+=(--allow-sensitive); fi
+          if [ "$ALLOW_EXEMPTIONS" = "true" ]; then flags+=(--allow-exemptions); fi
+          python3 scripts/meta_guard.py --base "origin/${BASE_REF}" "${flags[@]}"
+
+      # Advisory only — a warning annotation, never a failure.
+      - name: Docs-sync nudge — code changed without a CHANGELOG entry
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changes.outputs.code == 'true' &&
+          needs.changes.outputs.changelog != 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'no-changelog')
+        run: |
+          echo "::warning title=Docs-sync::Code changed but CHANGELOG.md was not updated. Add an entry under [Unreleased], or label this PR 'no-changelog' if intentional."
+
+  # ---- Required-check aggregator (the one check the branch ruleset requires) ----
+  # Path-filtered jobs (backend/frontend/docs) don't run on every PR, so none of them can be a
+  # required check directly — a required check that never posts blocks the PR forever. This job
+  # always runs, fans in every gate, and passes only if each was 'success' or legitimately
+  # 'skipped'. The branch ruleset (.github/rulesets/main.json) requires *this* context, so the gate
+  # cannot be edited away in-repo. See docs/decisions/0004.
+  ci-complete:
+    name: ci-complete
+    needs: [changes, hygiene, sast, backend, trust, frontend, docs, static]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The gate results arrive through the environment as JSON, never expanded into the script
+      # (zizmor template injection). The step counts what it inspected and refuses zero: the
+      # previous loop over an empty result list printed "All gates green." (ADR-0018).
+      - name: Verify every gate passed (or was skipped)
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          total=$(jq 'length' <<<"$NEEDS")
+          if [ "$total" -eq 0 ]; then
+            echo "::error title=CI incomplete::No gate results to check — refusing to report green."
+            exit 1
+          fi
+          echo "gate results ($total): $(jq -r 'to_entries | map("\(.key)=\(.value.result)") | join(" ")' <<<"$NEEDS")"
+          failed=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key)=\(.value.result)"' <<<"$NEEDS")
+          if [ -n "$failed" ]; then
+            echo "::error title=CI incomplete::A required gate did not pass: ${failed//$'\n'/ }. Fix it — do not make it non-required."
+            exit 1
+          fi
+          echo "All $total gates passed or were legitimately skipped."

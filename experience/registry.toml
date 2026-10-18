@@ -1,0 +1,212 @@
+# =============================================================================
+# Experience registry — lessons normalized into proportionate controls.
+#
+# Read experience/README.md for the enforcement ladder and the promotion rules.
+# Validated by `python3 scripts/risk_context.py --validate` (CI, blocking):
+# an entry claiming `guard` enforcement must NAME a file that actually exists.
+# A registry that can claim enforcement it doesn't have is just a wish list.
+#
+# `make risk-context` matches your current diff to the entries below.
+# =============================================================================
+schema_version = 1
+
+[[pattern]]
+id = "EXP-0001"
+title = "A guard that inspects nothing still reports green"
+enforcement = "guard"
+enforced_by = ["tests/guards/"]
+paths = ["scripts/*.py", "tests/guards/*.py", ".github/workflows/*.yml"]
+guidance = """
+A check whose loop matched zero files, or whose regex stopped matching, passes silently — and
+everything downstream trusts it. Prove the opposite: every guard needs a negative test showing
+it CAN fail, and any check that counts things should print its denominator.
+"""
+
+[[pattern]]
+id = "EXP-0002"
+title = "A check that runs locally but not in CI (or vice versa)"
+enforcement = "guard"
+enforced_by = ["tests/guards/test_workflow_invariants.py"]
+paths = ["Makefile", ".github/workflows/*.yml"]
+guidance = """
+When a `make` target and its CI job drift, a check can pass on your machine while being absent
+from the merge gate. Keep the command lists byte-identical, and add any new check to BOTH.
+"""
+
+[[pattern]]
+id = "EXP-0003"
+title = "Moving a threshold instead of fixing the gap it exposed"
+enforcement = "guard"
+enforced_by = ["scripts/meta_guard.py"]
+paths = ["backend/pyproject.toml", ".gitleaks.toml", ".semgrep/*.yml"]
+guidance = """
+Lowering a coverage floor, widening an ignore list, or raising a size budget makes the run green
+without restoring the protection. Thresholds are anti-regression ratchets: tighten freely, loosen
+only with an owner-approved `allow-exemptions` label and a stated reason.
+"""
+
+[[pattern]]
+id = "EXP-0004"
+title = "Documentation that quietly stops describing the system"
+enforcement = "guard"
+enforced_by = ["scripts/dod-check.py"]
+paths = ["docs/**", "backend/**", "README.md"]
+guidance = """
+A shipped component absent from the as-built page makes every later reader wrong. Update
+`docs/architecture/current-state.md` in the SAME change that adds the module, route or dependency
+— not in a follow-up that never comes.
+"""
+
+[[pattern]]
+id = "EXP-0005"
+title = "A passing SQLite test is not evidence of PostgreSQL behaviour"
+enforcement = "checklist"
+paths = ["backend/migrations/**", "backend/*/db/**", "backend/*/models/**"]
+guidance = """
+Row-level security, locking, constraint timing, extensions and migration behaviour differ between
+the in-memory test database and production PostgreSQL. Claims about any of those need evidence
+from PostgreSQL itself. This cannot be decided mechanically, so it is a checklist item: say in the
+PR which engine produced the evidence.
+"""
+
+[[pattern]]
+id = "EXP-0006"
+title = "A secret reaching the repository is permanent"
+enforcement = "guard"
+enforced_by = [".pre-commit-config.yaml", ".gitleaks.toml"]
+# Scoped to where a secret realistically gets pasted. gitleaks scans everything regardless —
+# this list only decides when the REMINDER is worth showing. A pattern that matches every change
+# is noise, and noise is how retrieval stops being read.
+paths = [".env*", "**/*.yml", "**/*.yaml", "**/*.toml", "deploy/**", ".github/**"]
+guidance = """
+Deleting a committed secret does not un-publish it; it must be rotated. Reference an env var,
+keep placeholders in `.env.example`, and never write a real `.env` or key file into the tree.
+"""
+
+[[pattern]]
+id = "EXP-0007"
+title = "An agent widening its own authority"
+enforcement = "guard"
+enforced_by = ["scripts/meta_guard.py"]
+paths = ["scripts/**", ".github/**", "experience/registry.toml", "CLAUDE.md", "AGENTS.md"]
+guidance = """
+When a guard blocks a change, the guard is usually right and the change is wrong. Editing the
+check — or promoting a lesson to a stronger rung — is a policy decision for the owner, raised as
+its own reviewed change, never bundled into the work the guard just blocked.
+"""
+
+[[pattern]]
+id = "EXP-0008"
+title = "Deploying a rebuilt artifact instead of the reviewed one"
+enforcement = "guard"
+enforced_by = [".github/workflows/release.yml", "deploy/verify.sh"]
+paths = ["deploy/**", ".github/workflows/release.yml"]
+guidance = """
+Rebuilding at deploy time ships bytes nobody reviewed, even from the same source. Promote the
+exact signed digest that CI produced, and verify the signature on the host before it runs.
+"""
+
+[[pattern]]
+id = "EXP-0011"
+title = "An escape hatch wider than the gate it escapes"
+enforcement = "guard"
+enforced_by = [
+  "scripts/meta_guard.py",
+  "tests/guards/test_workflow_invariants.py",
+]
+paths = [
+  ".github/workflows/*.yml",
+  ".github/dependabot.yml",
+  "requirements-ci.txt",
+  "scripts/meta_guard.py",
+]
+guidance = """
+A waiver that covers a path no gate covers is a hole with a name. The scanners that DECIDE
+whether a change is safe were installed unpinned while the application manifests sat in every
+"needs a human" list — the one dependency change nothing asked about. Before adding a waiver,
+check that every path it names is a path something really gates; and when an argument rests on
+a premise ("the version has cooled down"), encode the premise or the argument is decoration.
+"""
+
+[[pattern]]
+id = "EXP-0012"
+title = "A guard that is never wired in, or has no test proving it can fail"
+enforcement = "guard"
+enforced_by = ["scripts/check_guard_coverage.py"]
+paths = ["scripts/*.py", "tests/guards/*.py", "Makefile", ".claude/hooks/*.py"]
+guidance = """
+A guard can be written, reviewed, merged and never invoked. It then sits in scripts/ looking
+like a control and cited as one, having never run. A guard with no negative test is the same
+problem one layer down: nothing has demonstrated it can fail, so its green carries no
+information. Every guard needs a fault test AND an enforcement surface. A control is real when
+something exercises it end to end, not when its unit tests pass — when one is about to run for
+the first time, watch it run.
+"""
+
+[[pattern]]
+id = "EXP-0013"
+title = "Green on a pull request says nothing about green on the default branch"
+enforcement = "guard"
+enforced_by = ["tests/guards/test_workflow_invariants.py"]
+paths = [".github/workflows/*.yml"]
+guidance = """
+The two triggers take different paths through the same workflow: a path filter reads the diff
+through the API on a pull request and through git on a push, a re-run replays the ORIGINAL
+event payload so a label applied afterwards never took effect, and a cancelled run reports a
+non-success result. Defects here are structurally invisible until the first merge. Evaluate a
+check rollup by completion time, not by presence — a superseded run leaves a misleading entry.
+"""
+
+[[pattern]]
+id = "EXP-0014"
+title = "A verdict computed against the wrong tree"
+enforcement = "guard"
+enforced_by = [
+  "scripts/release_evidence.py",
+  "tests/guards/test_release_evidence.py",
+]
+paths = [
+  "scripts/prod_readiness.py",
+  "scripts/release_evidence.py",
+  ".github/workflows/release.yml",
+]
+guidance = """
+A check that runs somewhere other than against the thing it describes passes in exactly the
+case that matters. Promotion checks out the default branch, not the tag; a deploy host has
+whatever was last pulled. If the default branch has since closed a blocker the image still
+contains, a fresh scan there passes — and it looks like a control the whole time. Bind the
+verdict to the artifact it describes and have later steps read it from the signed record.
+"""
+
+[[pattern]]
+id = "EXP-0009"
+title = "A consequential action with no durable record"
+enforcement = "guard"
+enforced_by = ["backend/accord/telemetry/registry.py"]
+paths = ["backend/accord/api/**", "backend/accord/command/**"]
+guidance = """
+If an action cannot be reconstructed afterwards, an incident has no answer to "what happened, and
+who did it". Every consequential action needs an explicit emit / detection / audit / compliance
+decision — including the deliberate decision that it needs none.
+"""
+
+[[pattern]]
+id = "EXP-0010"
+title = "Trusting a claim because the record holding it is tamper-evident"
+enforcement = "guard"
+enforced_by = [
+  "backend/accord/command/audit.py",
+  "backend/tests/spine/test_coverage_guards.py",
+]
+paths = [
+  "backend/accord/api/**",
+  "backend/accord/telemetry/**",
+  "backend/accord/command/**",
+]
+guidance = """
+A hash chain proves nothing was altered afterwards. It says nothing about whether the entry was
+true when written. Anything a client supplied is a claim, so accepting an actor, timestamp or
+severity from a request body and sealing it produces a cryptographically verified falsehood.
+Record WHO OBSERVED a fact (`source`) alongside who acted, take attribution from the verified
+request, and keep client-reported events out of the chain and out of the compliance map.
+"""

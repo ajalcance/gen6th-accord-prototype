@@ -1,0 +1,157 @@
+# Cloud Run Service: backend API + Cloud SQL Auth Proxy sidecar, private Redis over TLS.
+# Replace BACKEND_IMAGE_DIGEST, PROXY_IMAGE_DIGEST and FRONTEND_ORIGIN before applying.
+# Apply: gcloud run services replace accord-api-service.yaml --project=gen6th-accord-production --region=asia-southeast1
+# Then: gcloud run services add-iam-policy-binding accord-api --member=allUsers --role=roles/run.invoker ...
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: accord-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "2"
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/network-interfaces: '[{"network":"accord-prod-vpc","subnetwork":"accord-prod-sg"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+        run.googleapis.com/container-dependencies: '{"api":["cloud-sql-proxy"]}'
+    spec:
+      serviceAccountName: accord-api@gen6th-accord-production.iam.gserviceaccount.com
+      containerConcurrency: 40
+      timeoutSeconds: 60
+      containers:
+        - name: api
+          image: asia-southeast1-docker.pkg.dev/gen6th-accord-production/accord-images/accord-backend@sha256:49e1bf4ffbcb72719f6c1153e0d3185e9caec4ab762e602f5185432273c2684d
+          ports:
+            - name: http1
+              containerPort: 8000
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            - name: DATABASE_TRANSPORT
+              value: cloud_sql_proxy
+            - name: TRUST_X_FORWARDED_FOR
+              value: "true"
+            - name: PERSONA_API_ENABLED
+              value: "true"
+            - name: PERSONA_PHOTOS_ENABLED
+              value: "false"
+            - name: PERSONA_EVIDENCE_ENABLED
+              value: "false"
+            - name: PERSONA_PUBLIC_PASSPORTS_ENABLED
+              value: "false"
+            - name: PERSONA_GOOGLE_ENABLED
+              value: "false"
+            - name: PERSONA_ASSISTANT_ENABLED
+              value: "true"
+            - name: PERSONA_ASSISTANT_PROJECT
+              value: gen6th-accord-production
+            - name: PERSONA_ASSISTANT_REGION
+              value: global
+            - name: PERSONA_ASSISTANT_MODEL
+              value: GEMINI_MODEL_ID
+            - name: ZYNTH_ISSUER
+              value: https://auth.zynthmedia.com
+            - name: ACCORD_APP_ORIGIN
+              value: FRONTEND_ORIGIN
+            - name: REDIS_CA_CERT_PATH
+              value: /secrets/redis-ca/ca.pem
+            - name: ZYNTH_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-zynth-client-id
+                  key: "1"
+            - name: ZYNTH_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-zynth-tenant-id
+                  key: "1"
+            - name: PERSONA_WORKSPACE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-workspace-id
+                  key: "1"
+            - name: ZYNTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-zynth-client-secret
+                  key: "1"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-app-secret
+                  key: "1"
+            - name: ZYNTH_SESSION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-session-key
+                  key: "1"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-api-database-url
+                  key: "1"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: accord-prod-redis-url
+                  key: "1"
+          volumeMounts:
+            - name: redis-ca
+              mountPath: /secrets/redis-ca
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 60
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy@sha256:e8c76356fb586300c63f0d29c8c75cfeeba33c29736f9d4afa2df2d78cd0fa19
+          args:
+            - "--private-ip"
+            - "--address=127.0.0.1"
+            - "--port=5432"
+            - "--health-check"
+            - "--http-address=0.0.0.0"
+            - "--http-port=9090"
+            - "--lazy-refresh"
+            - "--max-sigterm-delay=8s"
+            - "--min-sigterm-delay=2s"
+            - "--exit-zero-on-sigterm"
+            - "--max-connections=2"
+            - "gen6th-accord-production:asia-southeast1:accord-prod-db"
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 9090
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 9090
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: 256Mi
+      volumes:
+        - name: redis-ca
+          secret:
+            secretName: accord-prod-redis-ca
+            items:
+              - key: "1"
+                path: ca.pem

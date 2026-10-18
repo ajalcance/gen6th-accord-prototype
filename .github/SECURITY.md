@@ -1,0 +1,23 @@
+# Security Policy
+
+## Reporting a vulnerability
+
+**Please do not open a public issue for security vulnerabilities.**
+
+Use GitHub's
+[private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability):
+open this repository's **Security** tab and choose **Report a vulnerability**. No mailbox is
+published.
+
+Include: a description, steps to reproduce, affected version/commit, and impact. We aim to
+acknowledge within a few business days and will keep you updated on remediation.
+
+## Supported versions
+
+The latest released version on `main` is supported. Please upgrade before reporting issues on
+older versions.
+
+## Engineering posture
+
+See [`docs/SECURITY.md`](../docs/SECURITY.md) for how secrets, supply-chain, and runtime hardening
+are handled in this project.

@@ -1,0 +1,105 @@
+@media (max-width: 960px) {
+  .breadcrumb-product,
+  .breadcrumb small {
+    display: none;
+  }
+  .campaign-aside {
+    position: static;
+  }
+  .gallery-list .persona-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .gallery-list .portrait-wrap {
+    height: 64px;
+  }
+  .gallery-list .card-info {
+    flex-wrap: wrap;
+  }
+  .gallery-list .card-footer {
+    grid-column: 2;
+    padding-bottom: 12px;
+  }
+}
+@media (max-width: 760px) {
+  .breadcrumb {
+    display: none;
+  }
+  .topbar {
+    min-height: 48px;
+  }
+  .header-actions {
+    gap: 8px;
+  }
+  .header-actions .avatar {
+    display: none;
+  }
+  .gallery-view-bar {
+    align-items: flex-start;
+  }
+  .stage-track {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stage-track > span {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 0;
+  }
+  .scan-regions {
+    display: none;
+  }
+  .compare-label {
+    top: 8px;
+    max-width: 45%;
+  }
+  .campaign-actor-bar {
+    align-items: stretch;
+  }
+  .local-presence,
+  .footer-security {
+    font-size: 12px;
+  }
+  .footer-signals {
+    gap: 4px 12px;
+  }
+  .security-readiness dl > div {
+    flex-wrap: wrap;
+  }
+  .panel-heading {
+    flex-wrap: wrap;
+  }
+  .console-footer {
+    padding-top: 4px;
+  }
+}
+@media (pointer: coarse) {
+  :root {
+    --control-height: 44px;
+  }
+  button,
+  summary,
+  .footer-security {
+    min-height: 44px;
+  }
+  .card-open {
+    opacity: 1;
+  }
+}
+@media (max-height: 600px) {
+  .studio {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+  main {
+    overflow: visible;
+  }
+  .evidence-review,
+  .campaign-aside,
+  .topbar {
+    position: static;
+  }
+}

@@ -1,0 +1,302 @@
+.campaign-actor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.campaign-actor-bar strong,
+.campaign-actor-bar small {
+  display: block;
+  margin-top: var(--space-1);
+}
+.segmented-control {
+  display: flex;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+}
+.segmented-control button {
+  background: transparent;
+  border: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+}
+.segmented-control button[aria-pressed="true"] {
+  background: var(--color-raised);
+  color: var(--color-accent);
+}
+.details {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  margin: var(--space-5) 0;
+  line-height: 1.7;
+}
+.details dt,
+.details dd {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3) 0;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.details dt {
+  color: var(--color-muted);
+  padding-right: var(--space-3);
+}
+.details dd small {
+  display: block;
+  margin-top: var(--space-2);
+}
+.date-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.scope-fields .date-fields label {
+  margin-bottom: 0;
+}
+.scope-footer {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+.scope-footer > .primary {
+  width: 100%;
+}
+.permission-status {
+  border: 1px solid var(--color-border-strong);
+  padding: var(--panel-padding);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.permission-status .panel-heading {
+  align-items: center;
+}
+.permission-status .panel-heading > .icon {
+  color: var(--color-accent);
+}
+.permission-status.eligible {
+  border-color: var(--color-success);
+}
+.permission-status > h3 {
+  font-size: var(--text-lg);
+}
+.block-list {
+  padding-left: var(--space-5);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+.block-list > li {
+  margin-bottom: var(--space-3);
+}
+.checkbox {
+  display: flex;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+}
+.checkbox input {
+  width: 20px;
+  height: 20px;
+  margin-top: var(--space-1);
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+}
+.recipient-panel .button-row {
+  flex-direction: column-reverse;
+}
+.recipient-panel > .text-button {
+  margin-top: var(--space-3);
+}
+.public-layout {
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.2fr);
+}
+.passport-art {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 260px;
+  overflow: hidden;
+  background: var(--color-raised);
+}
+.passport-art > svg {
+  height: 100%;
+}
+.passport-mark {
+  position: absolute;
+  bottom: var(--space-5);
+  left: var(--space-5);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-canvas);
+  font-size: var(--text-sm);
+  letter-spacing: 2px;
+}
+.passport-cover-copy {
+  padding: var(--space-6);
+}
+.passport-cover-copy h2 {
+  font-size: var(--text-title);
+}
+.passport-cover-copy p {
+  color: var(--color-muted);
+}
+.passport-id {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-5);
+}
+.passport-id > span:first-child {
+  font: var(--text-xs) var(--font-mono);
+  color: var(--color-muted);
+}
+.public-projection > .section-bar {
+  margin-top: 0;
+}
+.public-projection .section-bar > .eyebrow {
+  margin-bottom: 0;
+  font-size: 10px;
+}
+.timeline {
+  list-style: none;
+  padding: 0 0 0 var(--space-5);
+  margin: var(--space-6) 0;
+  border-left: 1px solid var(--color-border-strong);
+}
+.timeline li {
+  position: relative;
+  padding: 0 0 var(--space-5) var(--space-2);
+}
+.timeline li:last-child {
+  padding-bottom: 0;
+}
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  border-radius: 50%;
+}
+.timeline strong {
+  font-weight: 500;
+}
+.timeline p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.disclosure-block,
+.private-note {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+  margin: var(--space-5) 0;
+}
+.disclosure-block .eyebrow {
+  margin-bottom: var(--space-2);
+}
+.disclosure-block p:last-child,
+.private-note p {
+  color: var(--color-muted);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.private-note strong {
+  display: block;
+  margin-bottom: var(--space-2);
+}
+.verification {
+  display: flex;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-raised);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+}
+.verification > .icon {
+  color: var(--color-warning);
+}
+.verification p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+.export-preview {
+  margin: var(--space-6) 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+  overflow: hidden;
+}
+.export-preview summary {
+  cursor: pointer;
+  padding: var(--space-4);
+  line-height: 1.6;
+}
+.export-preview pre {
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-4);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-xs)/1.7 var(--font-mono);
+  color: var(--color-muted);
+}
+@media (max-width: 1200px) {
+  .public-layout {
+    grid-template-columns: 1fr;
+  }
+  .passport-art {
+    aspect-ratio: 16 / 9;
+  }
+}
+@media (max-width: 760px) {
+  .campaign-actor-bar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: var(--space-5);
+  }
+  .segmented-control button {
+    flex: 1;
+  }
+  .details {
+    grid-template-columns: 1fr;
+  }
+  .details dt {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .details dd {
+    padding-top: var(--space-2);
+  }
+  .date-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .public-projection > .button-row {
+    flex-direction: column;
+  }
+  .passport-cover-copy h2 {
+    font-size: var(--text-title);
+  }
+}

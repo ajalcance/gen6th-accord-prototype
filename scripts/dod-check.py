@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Documentation-consistency guards for the Definition of Done.
+
+Five mechanical checks that catch documentation drift:
+
+1. **As-built coverage** — every module directory under the backend package, every
+   directory under ``frontend/`` (when that module is enabled), and every top-level project
+   directory must be named in ``docs/architecture/current-state.md``. Ship a component,
+   mention it, or this fails.
+2. **Stale references** — any repo-relative file path written in backticks in the docs
+   must exist. Catches references to renamed/deleted files.
+3. **Release freshness** — the latest *released* version in ``CHANGELOG.md`` must be
+   named in ``README.md`` and the as-built page.
+4. **ADR integrity** — decision records are numbered contiguously from 0001, no number is
+   reused, and every one is listed in ``docs/decisions/README.md``. An ADR nobody can find
+   from the index is a decision the next reader will unknowingly re-litigate.
+5. **Lessons ordering** — ``docs/LESSONS.md`` declares itself newest-first, so its dated
+   headings must actually be in descending order. A log that silently stops being ordered
+   stops being scannable, which is the only reason it is a log.
+
+Run from the repo root: ``python3 scripts/dod-check.py`` (or ``make dod-check``).
+Exit code is non-zero if anything is off.
+"""
+
+from __future__ import annotations
+
+import functools
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+# The ONLY interpolation in this file, and it stays on a line short enough that no package
+# name can overflow it. `make harness` lints this script AFTER rendering, so a copier value
+# on a prose line makes the gate pass for a short name and fail for a long one — which is
+# how a generated project goes red on day one for one adopter and nobody else.
+APP_PKG = "accord"
+ARCH = ROOT / "docs" / "architecture" / "current-state.md"
+
+# Top-level directories that are never part of the as-built surface: tooling caches and
+# vendored trees. Everything else at the top level must be documented.
+TOP_LEVEL_SKIP = {"node_modules", "__pycache__", "venv"}
+
+
+def top_level_dirs() -> list[str]:
+    """Every visible top-level directory, derived from the tree — never hand-listed.
+
+    A hand-written list (`backend`, `frontend`, `docs-site`, `deploy`, `scripts`) meant a new
+    top-level directory was never checked: `trust/` arrived on 2026-09-25 and this guard
+    reported "5 top-level dirs" and OK. Hidden directories are tooling (`.github/`, `.claude/`,
+    `.cache/`) and are not the product's layout.
+    """
+    return sorted(
+        path.name
+        for path in ROOT.iterdir()
+        if path.is_dir()
+        and not path.name.startswith(".")
+        and path.name not in TOP_LEVEL_SKIP
+        and not _in_nested_repository(Path(path.name))
+    )
+
+
+# Build output / vendored dirs inside frontend/ that are not part of the as-built surface.
+FRONTEND_SKIP_DIRS = {"node_modules", "public", "coverage", "out", "build"}
+
+DOC_GLOBS = ["docs/**/*.md", "*.md", ".github/**/*.md", ".claude/**/*.md"]
+
+CHECKED_PREFIXES = (
+    "backend/",
+    "frontend/",
+    "docs-site/",
+    "deploy/",
+    "scripts/",
+    "docs/",
+    ".github/",
+    ".semgrep/",
+    ".claude/",
+)
+PATH_RE = re.compile(
+    r"`([A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:py|ts|tsx|mjs|js|json|ya?ml|sh|toml|txt|css|md|ini|mako))`"
+)
+
+
+def check_as_built(errors: list[str]) -> None:
+    if not ARCH.is_file():
+        errors.append("docs/architecture/current-state.md is missing")
+        return
+    arch = ARCH.read_text()
+    for d in top_level_dirs():
+        if f"{d}/" not in arch and f"`{d}`" not in arch:
+            errors.append(f"current-state.md does not mention top-level dir '{d}/'")
+    app = ROOT / "backend" / APP_PKG
+    if app.is_dir():
+        for sub in sorted(app.iterdir()):
+            if sub.is_dir() and not sub.name.startswith("__"):
+                # Require the module as a path token (`name/`) or backticked (`name`), not a bare
+                # substring — otherwise 'db' would spuriously match inside any longer word.
+                if f"{sub.name}/" not in arch and f"`{sub.name}`" not in arch:
+                    errors.append(
+                        f"current-state.md does not mention module "
+                        f"'backend/{APP_PKG}/{sub.name}/' — document it in the As-Built section"
+                    )
+
+
+def check_frontend_as_built(errors: list[str]) -> None:
+    """Same freshness rule as the backend package, applied to frontend/.
+
+    Without this, only a wholesale removal of ``frontend/`` was caught (it is a top-level dir);
+    new panels, hooks or lib splits inside it drifted from the as-built page by discipline
+    alone. That is the same class of drift this guard exists to prevent, left unprotected on
+    one of the two application layers. No-ops when the frontend module isn't enabled.
+    """
+    if not ARCH.is_file():
+        return  # already reported by check_as_built
+    arch = ARCH.read_text()
+    fe = ROOT / "frontend"
+    if not fe.is_dir():
+        return
+    for sub in sorted(fe.iterdir()):
+        if not sub.is_dir() or sub.name.startswith(".") or sub.name in FRONTEND_SKIP_DIRS:
+            continue
+        # Require the QUALIFIED path token: a bare 'app/' would match 'backend/app/' and pass
+        # spuriously — the same substring trap the backend check above guards against.
+        token = f"frontend/{sub.name}"
+        if token not in arch:
+            errors.append(
+                f"current-state.md does not mention '{token}/' — document it in the As-Built "
+                f"section (write the path as 'frontend/{sub.name}/')"
+            )
+
+
+ADR_FILE_RE = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
+LESSON_DATE_RE = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})", re.MULTILINE)
+
+
+def check_adr_integrity(errors: list[str]) -> None:
+    decisions = ROOT / "docs" / "decisions"
+    if not decisions.is_dir():
+        return
+    by_number: dict[int, list[str]] = {}
+    for path in sorted(decisions.iterdir()):
+        match = ADR_FILE_RE.match(path.name)
+        if match:  # skips README.md and template.md by construction
+            by_number.setdefault(int(match.group(1)), []).append(path.name)
+    if not by_number:
+        return
+
+    for number, names in sorted(by_number.items()):
+        if len(names) > 1:
+            errors.append(
+                f"ADR number {number:04d} is used by {len(names)} files ({', '.join(names)}) — "
+                f"renumber one; a duplicate makes references ambiguous"
+            )
+
+    numbers = sorted(by_number)
+    expected = list(range(1, len(numbers) + 1))
+    if numbers != expected:
+        missing = sorted(set(expected) - set(numbers))
+        errors.append(
+            f"ADR numbers must run contiguously from 0001; missing {missing or numbers} — "
+            f"a gap usually means a deleted decision that other docs still cite"
+        )
+
+    index = decisions / "README.md"
+    index_text = index.read_text() if index.is_file() else ""
+    for names in by_number.values():
+        for name in names:
+            if name not in index_text:
+                errors.append(
+                    f"docs/decisions/README.md does not index '{name}' — add it so the decision "
+                    f"is discoverable"
+                )
+
+
+def check_lessons_ordering(errors: list[str]) -> None:
+    lessons = ROOT / "docs" / "LESSONS.md"
+    if not lessons.is_file():
+        return
+    dates = LESSON_DATE_RE.findall(lessons.read_text())
+    if len(dates) < 2:
+        return  # a fresh project has no entries to order
+    # strict=False is correct here and stated: dates[1:] is one shorter by construction.
+    for newer, older in zip(dates, dates[1:], strict=False):
+        if newer < older:  # ISO dates compare correctly as strings
+            errors.append(
+                f"docs/LESSONS.md is documented as newest-first but {newer} appears above "
+                f"{older} — move the new entry to the top"
+            )
+            break
+
+
+@functools.cache
+def _in_nested_repository(directory: Path) -> bool:
+    """True inside a directory that is its own git repository — a worktree, a vendored clone.
+
+    `.claude/**/*.md` reached Claude Code's agent worktrees in `.claude/worktrees/` on
+    2026-09-25 and failed on a README inside a worktree's node_modules. Another repository's
+    documents are not this project's documentation.
+    """
+    if directory == Path("."):
+        return False
+    return (ROOT / directory / ".git").exists() or _in_nested_repository(directory.parent)
+
+
+def check_stale_refs(errors: list[str]) -> None:
+    seen: set[tuple[str, str]] = set()
+    for pattern in DOC_GLOBS:
+        for doc in ROOT.glob(pattern):
+            if not doc.is_file() or _in_nested_repository(doc.relative_to(ROOT).parent):
+                continue
+            for m in PATH_RE.finditer(doc.read_text()):
+                path = m.group(1)
+                if not path.startswith(CHECKED_PREFIXES):
+                    continue
+                key = (str(doc), path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if not (ROOT / path).exists():
+                    rel = doc.relative_to(ROOT)
+                    errors.append(f"{rel}: references missing path `{path}`")
+
+
+CHANGELOG = ROOT / "CHANGELOG.md"
+FRESHNESS_DOCS = ("README.md", "docs/architecture/current-state.md")
+RELEASE_RE = re.compile(r"^##\s*\[(\d+\.\d+\.\d+)\]", re.MULTILINE)
+
+
+def check_release_consistency(errors: list[str]) -> None:
+    if not CHANGELOG.is_file():
+        return
+    match = RELEASE_RE.search(CHANGELOG.read_text())
+    if match is None:  # no released version yet — nothing to check
+        return
+    version = match.group(1)
+    for rel in FRESHNESS_DOCS:
+        doc = ROOT / rel
+        if not doc.is_file():
+            errors.append(f"freshness: expected front-door doc '{rel}' is missing")
+            continue
+        if version not in doc.read_text():
+            errors.append(
+                f"{rel}: does not mention the latest released version '{version}' "
+                f"(from CHANGELOG.md) — update the status/version line after a promotion"
+            )
+
+
+def _denominator() -> dict[str, int]:
+    """What this run has to inspect, counted from the tree rather than assumed.
+
+    Printed on every run and checked below. Each of these checks walks a directory, and a
+    directory that has moved or been renamed makes the check silently vacuous — it finds
+    nothing to complain about and prints OK, which reads exactly like a healthy repository.
+    """
+    app = ROOT / "backend" / APP_PKG
+    frontend = ROOT / "frontend"
+    decisions = ROOT / "docs" / "decisions"
+    return {
+        "top-level dirs": len(top_level_dirs()),
+        "backend modules": (
+            sum(1 for s in app.iterdir() if s.is_dir() and not s.name.startswith("__"))
+            if app.is_dir()
+            else 0
+        ),
+        "frontend dirs": (
+            sum(
+                1
+                for s in frontend.iterdir()
+                if s.is_dir() and not s.name.startswith(".") and s.name not in FRONTEND_SKIP_DIRS
+            )
+            if frontend.is_dir()
+            else 0
+        ),
+        "ADRs": len(list(decisions.glob("*.md"))) if decisions.is_dir() else 0,
+    }
+
+
+def main() -> int:
+    errors: list[str] = []
+    counts = _denominator()
+    summary = " · ".join(f"{value} {name}" for name, value in counts.items())
+    print(f"dod-check: inspected {summary}")
+    # The denominator rule (EXP-0001). The backend package is the one set that must never be
+    # empty: if APP_PKG has been renamed, every as-built assertion below walks an absent
+    # directory, finds nothing, and prints OK over a page that describes a different project.
+    if not counts["backend modules"] and not counts["top-level dirs"]:
+        print(
+            f"\ndod-check: FAILED — nothing was inspected. 'backend/{APP_PKG}/' and the\n"
+            f"top-level directory list are both empty, so every as-built check below would\n"
+            f"pass over an empty set. Update APP_PKG in this script after a package rename."
+        )
+        return 1
+
+    check_as_built(errors)
+    check_frontend_as_built(errors)
+    check_stale_refs(errors)
+    check_release_consistency(errors)
+    check_adr_integrity(errors)
+    check_lessons_ordering(errors)
+    if errors:
+        print("dod-check: FAILED\n")
+        for e in errors:
+            print(f"  ✗ {e}")
+        print(f"\n{len(errors)} issue(s). Fix the docs (or the path) and re-run.")
+        return 1
+    print("dod-check: OK — as-built coverage and doc references are consistent.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

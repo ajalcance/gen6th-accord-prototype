@@ -1,0 +1,60 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Secrets & local env (NEVER commit real values) ---
+.env
+.env.*
+!.env.example
+# Inert in a generated project (no such file exists here) — this exception protects the
+# TEMPLATE repo that ships this .gitignore. Copier's dirty-repo flow clones with
+# --no-checkout and re-stages the worktree against an empty index, so these ignore rules
+# apply to the template's own tracked files; without the exception, `.env.*` silently
+# drops .env.example.jinja from every generation made from a locally modified template.
+!.env.example.jinja
+*.pem
+*.key
+
+# --- Node ---
+node_modules/
+.next/
+dist/
+
+# --- Agent settings ---
+# Machine-local Claude Code overrides. Deliberately ignored: the shared policy lives in
+# .claude/settings.json, and a local file must never become necessary to the team workflow
+# (or a quiet way to weaken the shared one).
+.claude/settings.local.json
+# Backups of either settings file, made before a policy change. As machine-specific as the file
+# itself (zynth-auth committed one by mistake: the backup escaped the rule above).
+.claude/*.bak*
+# Claude Code's agent worktrees: separate checkouts of this repository, never its content.
+# Committing one would embed a second repository here.
+.claude/worktrees/
+
+# --- Local tool binaries ---
+# Checksum-verified scanner binaries downloaded for local runs (hadolint, zizmor, gitleaks).
+# CI downloads and verifies its own copies; a binary must never be committed.
+.tools/
+
+# --- Agent tool caches ---
+# The agent's sandbox cannot read or write the home directory, so its tools keep their caches
+# here (set in .claude/settings.json `env`). A cache outside the project would be a place a
+# sandboxed command could leave something for an unsandboxed one to run later.
+.cache/
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,63 @@
+{
+  "contract_version": 1,
+  "kind": "preparation-contract-not-a-deployment-manifest",
+  "project": "gen6th-accord-production",
+  "region": "asia-southeast1",
+  "image": {
+    "lineage": "official-Cisco-Talos-ClamAV-container",
+    "reference": null,
+    "status": "pending-reviewed-immutable-digest-and-signature-release-evidence",
+    "require_digest": true,
+    "require_release_evidence": true
+  },
+  "listener": { "address": "127.0.0.1", "port": 3310, "public_ingress": false },
+  "readiness": {
+    "application_module": "accord.personas.scanner_probe",
+    "commands": ["PING", "VERSION"],
+    "deadline_seconds": 5,
+    "response_limit_bytes": 1024,
+    "maximum_definition_age_hours": 48,
+    "maximum_future_definition_minutes": 5,
+    "status": "source-prepared-not-wired-into-startup",
+    "native_cloud_run_exec_probe": false,
+    "does_not_prove_clean_scan_or_container_liveness": true
+  },
+  "application_scan_bounds": {
+    "input_bytes": 10485760,
+    "concurrency": 2,
+    "concurrency_scope": "per-adapter-instance-aggregate-process-and-revision-budget-pending",
+    "deadline_seconds": 20,
+    "protocol": "INSTREAM-no-remote-filenames",
+    "fresh_receipts_checked_before_and_after_each_scan": true
+  },
+  "runtime_requirements": {
+    "non_root": true,
+    "reviewed_uid_and_process_supervision": "pending",
+    "private_original_file_mounts": false,
+    "database_credentials_and_secret_mounts": false,
+    "scanner_specific_google_credentials": false,
+    "container_level_iam_isolation_claimed": false,
+    "daemon_limit_exceeded_must_not_be_a_clean_result": true,
+    "exact_daemon_configuration_and_limits": "pending-version-specific-review"
+  },
+  "definitions": {
+    "updater": "official-FreshClam-policy-pending",
+    "storage_and_permissions": "pending-reviewed-writable-definition-storage",
+    "cpu_and_network": "pending-explicit-idle-update-and-egress-design",
+    "startup_requires_loaded_fresh_definitions": true,
+    "stale_or_unavailable_at_use": "deny"
+  },
+  "resources": {
+    "documented_generic_minimum_memory_gib": 3,
+    "documented_generic_preferred_memory_gib": 4,
+    "selected_memory_cpu_storage": null,
+    "acceptance": "measure-cold-start-download-scan-two-way-concurrency-definition-reload-and-idle-staleness"
+  },
+  "remaining": [
+    "verified-image-and-reviewed-release-integration",
+    "application-startup-and-platform-health-wiring",
+    "daemon-config-updater-storage-identity-resource-review",
+    "TERM-shutdown-and-definition-reload-acceptance",
+    "isolated-owner-benign-and-malware-test-inspection"
+  ]
+}

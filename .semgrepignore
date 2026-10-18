@@ -1,0 +1,11 @@
+# Semgrep path list (ADR-0018). Without this file Semgrep applies a built-in default list that
+# silently left 32 tracked files unscanned — the test suites and the guards' own fault tests
+# among them. This file replaces that default, so only generated or vendored trees are left
+# out; everything a person or agent writes is scanned. Adding a path here is a reviewed change:
+# scripts/meta_guard.py treats this file as scanner config.
+node_modules/
+.venv/
+.next/
+dist/
+coverage/
+.tools/

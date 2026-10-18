@@ -1,0 +1,180 @@
+"""Hash-chained audit spine — the tamper-evident system of record.
+
+The event store is the fast, fail-open index; the audit log is the durable, tamper-evident
+subset. Each entry's hash covers its content **plus the previous entry's hash**, so any edit,
+deletion, or reorder breaks the chain (``verify_chain`` finds the first break). The worker seals
+entries from the durable ``events`` cold store, so the chain is serialized without hot-path locks.
+
+Coverage is enforced: every emitted action must be in ``AUDITABLE_ACTIONS`` or ``AUDIT_EXEMPT``.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+from sqlalchemy import exists, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from accord.command.controls import controls_for
+from accord.command.models import AuditLog, Event
+from accord.telemetry.registry import CLIENT_ACTIONS
+
+# The chain records what THIS SERVICE observed. A client-reported event is evidence that a browser
+# said something, not that it happened — sealing one would give a claim the same cryptographic
+# standing as an observation, which is the failure mode a tamper-evident log is supposed to close.
+# Enforced here at runtime AND statically in tests/spine/test_coverage_guards.py, because a
+# registry mistake and a code mistake are different mistakes.
+SEALABLE_SOURCE = "server"
+
+GENESIS_HASH = "0" * 64
+
+# Security-significant actions written to the tamper-evident log.
+AUDITABLE_ACTIONS: frozenset[str] = frozenset(
+    {
+        "auth.session_observed",
+        "workspace.membership_provisioned",
+        "persona.version_saved",
+        "persona.portrait_uploaded",
+        "persona.portrait_inspected",
+        "persona.portrait_bound",
+        "persona.portrait_read",
+        "persona.evidence_quarantined",
+        "persona.evidence_inspected",
+        "persona.evidence_read",
+        "persona.evidence_purged",
+        "persona.version_read",
+        "persona.access_denied",
+        "persona.write_conflict",
+        "persona.workspace_observed",
+        "persona.review_recorded",
+        "persona.workflow_observed",
+        "persona.asset_registered",
+        "persona.passport_issued",
+        "persona.publication_approved",
+        "persona.publication_revoked",
+        "persona.publication_observed",
+        "persona.campaign_offered",
+        "persona.campaign_decided",
+        "command.persona_detection_evaluated",
+    }
+)
+
+# Explicitly NOT audited. Two kinds live here: per-action judgement calls (high-volume,
+# low-value reads — add those by name), and EVERY client-reported action, included as a set
+# union because ADR-0012 makes that exemption invariant — a claim can never be evidence, so
+# per-action "decisions" that must always come out the same way would be ceremony, and hand
+# mirroring them here is the drift the guards would then have to police.
+AUDIT_EXEMPT: frozenset[str] = frozenset() | CLIENT_ACTIONS
+
+
+def _canonical_content(entry: AuditLog) -> str:
+    """Deterministic JSON of an entry's semantic fields (excludes seq + the chain hashes)."""
+    return json.dumps(
+        {
+            "event_id": entry.event_id,
+            "ts": entry.ts.isoformat(),
+            "actor_type": entry.actor_type,
+            "actor_id": entry.actor_id,
+            "tenant_id": str(entry.tenant_id) if entry.tenant_id else None,
+            "action": entry.action,
+            "outcome": entry.outcome,
+            "severity": entry.severity,
+            "resource_type": entry.resource_type,
+            "resource_id": entry.resource_id,
+            "ip": entry.ip,
+            "metadata": entry.metadata_,
+            "compliance_tags": entry.compliance_tags,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+
+
+def compute_hash(prev_hash: str, entry: AuditLog) -> str:
+    """entry_hash = SHA-256(prev_hash || canonical_content)."""
+    return hashlib.sha256((prev_hash + _canonical_content(entry)).encode()).hexdigest()
+
+
+def _entry_from_event(event: Event, prev_hash: str) -> AuditLog:
+    entry = AuditLog(
+        event_id=event.event_id,
+        ts=event.ts,
+        actor_type=event.actor_type,
+        actor_id=event.actor_id,
+        tenant_id=event.tenant_id,
+        action=event.action,
+        outcome=event.outcome,
+        severity=event.severity,
+        resource_type=event.resource_type,
+        resource_id=event.resource_id,
+        ip=event.ip,
+        metadata_=event.metadata_,
+        compliance_tags=controls_for(event.action),
+        prev_hash=prev_hash,
+    )
+    entry.entry_hash = compute_hash(prev_hash, entry)
+    return entry
+
+
+async def seal_new(session: AsyncSession, *, batch: int = 500) -> int:
+    """Chain auditable events not yet in the log. Returns the number sealed."""
+    # A transaction lock also protects the empty-chain case: locking the last row cannot.
+    # Every sealer must acquire this stable lock before reading the chain head.
+    await session.execute(text("SELECT pg_advisory_xact_lock(9182401)"))
+    last = await session.scalar(select(AuditLog).order_by(AuditLog.seq.desc()).limit(1))
+    prev_hash = last.entry_hash if last else GENESIS_HASH
+
+    unaudited = (
+        (
+            await session.execute(
+                select(Event)
+                .where(
+                    Event.action.in_(AUDITABLE_ACTIONS),
+                    Event.source == SEALABLE_SOURCE,
+                    ~exists().where(AuditLog.event_id == Event.event_id),
+                )
+                .order_by(Event.ts, Event.event_id)
+                .limit(batch)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    for event in unaudited:
+        entry = _entry_from_event(event, prev_hash)
+        session.add(entry)
+        prev_hash = entry.entry_hash
+    await session.commit()  # Release the chain lock even when there is nothing to seal.
+    return len(unaudited)
+
+
+async def verify_chain(session: AsyncSession) -> tuple[bool, int | None, int]:
+    """Recompute the whole chain. Returns (ok, first_broken_seq, total_entries)."""
+    prev_hash = GENESIS_HASH
+    total = 0
+    entries = (await session.execute(select(AuditLog).order_by(AuditLog.seq))).scalars()
+    for entry in entries:
+        total += 1
+        if entry.prev_hash != prev_hash or compute_hash(prev_hash, entry) != entry.entry_hash:
+            return (False, entry.seq, total)
+        prev_hash = entry.entry_hash
+    return (True, None, total)
+
+
+def entry_dict(entry: AuditLog) -> dict[str, Any]:
+    return {
+        "seq": entry.seq,
+        "event_id": entry.event_id,
+        "ts": entry.ts.isoformat(),
+        "actor": {"type": entry.actor_type, "id": entry.actor_id},
+        "action": entry.action,
+        "outcome": entry.outcome,
+        "severity": entry.severity,
+        "metadata": entry.metadata_,
+        "compliance_tags": entry.compliance_tags,
+        "entry_hash": entry.entry_hash,
+    }

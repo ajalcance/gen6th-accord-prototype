@@ -1,0 +1,307 @@
+@media (max-width: 1300px) {
+  :where(.booklet-dialog) .booklet-page {
+    padding: 30px 30px 20px;
+  }
+  :where(.booklet-dialog) .identity-layout {
+    gap: 20px;
+  }
+  :where(.booklet-dialog) .booklet-portrait > img,
+  :where(.booklet-dialog) .empty-portrait {
+    min-height: 290px;
+  }
+  :where(.booklet-dialog) .record-sections li {
+    grid-template-columns: 35px minmax(0, 1fr) 25px;
+    gap: 10px;
+    padding-top: 13px;
+  }
+  :where(.booklet-dialog) .record-sections li::after {
+    left: 45px;
+    right: 45px;
+  }
+  :where(.booklet-dialog) .record-heading h3 {
+    margin-bottom: 15px;
+  }
+  :where(.booklet-dialog) .accord-logo {
+    margin-top: 9px;
+  }
+  :where(.booklet-dialog) .signed-panel {
+    gap: 12px;
+    padding: 13px;
+  }
+  :where(.booklet-dialog) .identity-fields {
+    gap: 13px;
+  }
+  :where(.booklet-dialog) .identity-fields > div {
+    padding-bottom: 8px;
+  }
+}
+@media (max-width: 900px) {
+  :where(.booklet-dialog) .passport-booklet {
+    grid-template-columns: minmax(0, 1fr);
+    aspect-ratio: auto;
+    max-width: 760px;
+    margin: auto;
+    border-radius: 20px;
+  }
+  :where(.booklet-dialog) .booklet-page {
+    padding: 35px 40px 22px;
+  }
+  :where(.booklet-dialog) .identity-page {
+    border-right: 0;
+    border-bottom: 1px solid #b8bfc0;
+    box-shadow: none;
+  }
+  :where(.booklet-dialog) .record-page {
+    box-shadow: none;
+    min-height: 740px;
+  }
+  :where(.booklet-dialog) .identity-heading h3 {
+    font-size: clamp(28px, 6vw, 47px);
+  }
+  :where(.booklet-dialog) .identity-state {
+    font-size: 21px;
+  }
+  :where(.booklet-dialog) .authority-kicker {
+    font-size: 17px;
+  }
+  :where(.booklet-dialog) .identity-fields dt {
+    font-size: 13px;
+  }
+  :where(.booklet-dialog) .identity-fields dd {
+    font-size: 21px;
+  }
+  :where(.booklet-dialog) .booklet-portrait > img,
+  :where(.booklet-dialog) .empty-portrait {
+    min-height: 370px;
+  }
+  :where(.booklet-dialog) .machine-line {
+    font-size: 19px;
+  }
+  :where(.booklet-dialog) .record-heading h3 {
+    font-size: 33px;
+  }
+  :where(.booklet-dialog) .accord-logo {
+    margin: 14px auto 24px;
+  }
+  :where(.booklet-dialog) .record-sections h4 {
+    font-size: 24px;
+  }
+  :where(.booklet-dialog) .record-sections li {
+    padding: 20px 0 25px;
+    margin-bottom: 15px;
+  }
+  :where(.booklet-dialog) .section-summary {
+    font-size: 23px;
+  }
+  :where(.booklet-dialog) .record-detail {
+    font-size: 11px;
+  }
+  :where(.booklet-dialog) .signed-panel {
+    grid-template-columns: 110px minmax(0, 1fr) 90px;
+  }
+  :where(.booklet-dialog) .signature-caption strong {
+    font-size: 22px;
+  }
+  :where(.booklet-dialog) .signature-caption > span {
+    font-size: 15px;
+  }
+  :where(.booklet-dialog) .permission-note {
+    font-size: 13px;
+  }
+}
+@media (max-width: 540px) {
+  :where(.booklet-dialog) .booklet-page {
+    padding: 29px 24px 18px;
+  }
+  :where(.booklet-dialog) .authority-kicker {
+    gap: 9px;
+    font-size: 12px;
+  }
+  :where(.booklet-dialog) .identity-heading h3 {
+    font-size: clamp(23px, 6.5vw, 35px);
+  }
+  :where(.booklet-dialog) .identity-state {
+    font-size: 12px;
+  }
+  :where(.booklet-dialog) .identity-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :where(.booklet-dialog) .booklet-portrait {
+    width: 68%;
+    margin: auto;
+  }
+  :where(.booklet-dialog) .booklet-portrait > img,
+  :where(.booklet-dialog) .empty-portrait {
+    min-height: 240px;
+  }
+  :where(.booklet-dialog) .identity-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px;
+  }
+  :where(.booklet-dialog) .identity-fields > div:first-child {
+    grid-column: 1/-1;
+  }
+  :where(.booklet-dialog) .identity-fields dt {
+    font-size: 10px;
+  }
+  :where(.booklet-dialog) .identity-fields dd {
+    font-size: 16px;
+  }
+  :where(.booklet-dialog) .machine-line {
+    font-size: 12px;
+  }
+  :where(.booklet-dialog) .record-page {
+    min-height: 640px;
+  }
+  :where(.booklet-dialog) .record-heading h3 {
+    font-size: 24px;
+  }
+  :where(.booklet-dialog) .record-sections li {
+    grid-template-columns: 29px minmax(0, 1fr);
+    gap: 10px;
+  }
+  :where(.booklet-dialog) .record-number {
+    font-size: 24px;
+  }
+  :where(.booklet-dialog) .record-sections h4 {
+    font-size: 19px;
+  }
+  :where(.booklet-dialog) .section-summary {
+    font-size: 18px;
+  }
+  :where(.booklet-dialog) .number-rosette {
+    display: none;
+  }
+  :where(.booklet-dialog) .record-sections li::after {
+    left: 39px;
+    right: 0;
+  }
+  :where(.booklet-dialog) .signed-panel {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+  }
+  :where(.booklet-dialog) .signature-caption strong {
+    font-size: 17px;
+  }
+  :where(.booklet-dialog) .signature-caption > span {
+    font-size: 12px;
+  }
+  :where(.booklet-dialog) .booklet-qr {
+    grid-column: 1/-1;
+    width: 82px;
+    justify-self: center;
+  }
+  :where(.booklet-dialog) .unsigned-panel strong {
+    font-size: 18px;
+  }
+  :where(.booklet-dialog) .page-footer p {
+    font-size: 8px;
+  }
+}
+
+:where(.booklet-dialog) .passport-booklet {
+  aspect-ratio: auto;
+  min-height: 860px;
+}
+:where(.booklet-dialog) .machine-line {
+  white-space: pre-wrap;
+}
+:where(.booklet-dialog) .record-detail {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+:where(.booklet-dialog) .booklet-qr {
+  width: 100%;
+  padding: 5px;
+  background: #fffefa;
+  border: 1px solid #c8c7b8;
+}
+:where(.booklet-dialog) .booklet-qr > svg {
+  width: 100%;
+  height: auto;
+}
+:where(.booklet-dialog) .signature-caption a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  font-size: 14px;
+}
+:where(.booklet-dialog) .permission-note p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .booklet-dialog {
+    padding: 12px;
+    width: 98vw;
+  }
+  .booklet-toolbar,
+  .booklet-status {
+    align-items: start;
+    flex-direction: column;
+  }
+  :where(.booklet-dialog) .booklet-qr {
+    grid-column: 1/-1;
+    width: 110px;
+    justify-self: center;
+  }
+}
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 8mm;
+  }
+  body:has(.booklet-dialog[open]) * {
+    visibility: hidden;
+  }
+  .booklet-dialog[open],
+  .booklet-dialog[open] * {
+    visibility: visible;
+  }
+  .booklet-dialog[open] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    padding: 0;
+  }
+  .booklet-dialog .booklet-toolbar,
+  .booklet-dialog .booklet-status,
+  .booklet-dialog .booklet-explanation {
+    display: none;
+  }
+  :where(.booklet-dialog) .passport-booklet {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    min-height: 0;
+  }
+  :where(.booklet-dialog) .booklet-page {
+    padding: 24px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  :where(.booklet-dialog) .identity-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+  :where(.booklet-dialog) .identity-fields {
+    display: flex;
+  }
+  :where(.booklet-dialog) .booklet-portrait {
+    width: auto;
+    margin: 0;
+  }
+  :where(.booklet-dialog) .signed-panel {
+    grid-template-columns: 85px minmax(0, 1fr) 100px;
+  }
+  :where(.booklet-dialog) .booklet-qr {
+    grid-column: auto;
+    width: auto;
+  }
+}

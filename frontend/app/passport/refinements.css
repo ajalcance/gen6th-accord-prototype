@@ -1,0 +1,320 @@
+/* Fourth-pass task hierarchy and input affordances. */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.breadcrumb > span {
+  padding: 0;
+}
+.breadcrumb .breadcrumb-product {
+  color: var(--color-muted);
+}
+.breadcrumb small {
+  border-left: 1px solid var(--color-border);
+  padding-left: 8px;
+}
+.topbar {
+  min-height: 52px;
+}
+.page-heading {
+  gap: 16px;
+}
+.nav-item.active {
+  border-left: 3px solid var(--color-inspect);
+  background: var(--color-raised);
+}
+.nav-item,
+.utility-nav button {
+  font-size: 14px;
+}
+.summary-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+}
+.summary-metric:hover {
+  background: var(--color-raised);
+}
+.summary-metric > span {
+  font-size: 12px;
+  color: var(--color-muted);
+  letter-spacing: 0.6px;
+}
+.summary-strip {
+  border-top: 2px solid var(--color-accent);
+}
+.gallery-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.gallery-view-bar p {
+  margin: 0;
+}
+.gallery-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.gallery-list .persona-card {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) minmax(180px, 0.8fr);
+  align-items: center;
+}
+.gallery-list .portrait-wrap {
+  aspect-ratio: 1;
+  height: 80px;
+}
+.gallery-list .card-info {
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 16px;
+}
+.gallery-list .card-footer {
+  border-top: 0;
+  flex-wrap: wrap;
+}
+.gallery-list .card-open {
+  opacity: 1;
+}
+.list-permission {
+  display: none;
+}
+.gallery-list .list-permission {
+  display: block;
+  width: 100%;
+}
+.completed-source summary {
+  min-height: 36px;
+  padding: 8px 0;
+  color: var(--color-inspect);
+}
+.persona-card:hover {
+  border-color: var(--color-inspect);
+  background: var(--color-raised);
+}
+.card-state {
+  font-size: 12px;
+}
+.card-footer {
+  flex-wrap: wrap;
+}
+.passport-context {
+  display: block;
+}
+summary {
+  cursor: pointer;
+}
+.passport-context summary,
+.verification-requirements summary,
+.activity-timeline summary {
+  min-height: 36px;
+  padding: 8px 0;
+  font-size: 14px;
+}
+.evidence-details {
+  display: block;
+}
+.evidence-details summary {
+  min-height: 36px;
+}
+.evidence-details > svg:not(.icon) {
+  max-height: 180px;
+  margin-top: 12px;
+}
+.availability-note {
+  border-left: 2px solid var(--color-border-strong);
+  padding: 8px 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.preview-card p {
+  margin-bottom: 12px;
+}
+.decision-area {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+.decision-blockers {
+  background: var(--color-subtle);
+  padding: 12px;
+  border-left: 2px solid var(--color-warning);
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+.decision-blockers ul {
+  padding-left: 16px;
+  line-height: 1.7;
+}
+.review-actions,
+.recipient-panel .button-row {
+  flex-direction: column;
+}
+.review-actions .primary {
+  order: 0;
+}
+.compare-images {
+  touch-action: pan-y;
+  cursor: ew-resize;
+}
+.compare-images svg {
+  user-select: none;
+}
+.reference-control summary {
+  padding: 12px;
+  min-height: 44px;
+  font-size: 12px;
+}
+.reference-control p {
+  padding: 0 12px 12px;
+}
+.reference-card[aria-expanded="true"] {
+  border-color: var(--color-inspect);
+  box-shadow: inset 0 0 0 1px var(--color-inspect);
+}
+.stage-track small,
+.stage-track > span > span,
+.canvas-label,
+.canvas-caption small,
+.source-label,
+.compare-label {
+  font-size: 12px;
+}
+.scan-regions span {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.campaign-main {
+  display: grid;
+  gap: 16px;
+}
+.campaign-aside {
+  position: sticky;
+  top: 4px;
+}
+.campaign-actor-bar {
+  align-items: flex-start;
+}
+.scope-state {
+  padding: 12px;
+  background: var(--color-subtle);
+  border-left: 2px solid var(--color-inspect);
+  font-size: 12px;
+}
+.owner-actions {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.accepted-notice {
+  padding: 12px;
+  border-left: 2px solid var(--color-success);
+  background: var(--color-subtle);
+}
+.text-button.danger-text {
+  color: var(--color-danger);
+}
+.destructive {
+  background: var(--color-danger);
+  color: #301019;
+  padding: 8px 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: 6px;
+  font-weight: 600;
+}
+.destructive:hover {
+  background: #ffd0d5;
+}
+.source-chip {
+  background: var(--color-subtle);
+  text-align: left;
+  color: var(--color-inspect);
+}
+.source-chip:hover {
+  background: var(--color-raised);
+}
+.drawer-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.drawer-header .eyebrow,
+.public-projection .section-bar > .eyebrow,
+.nav-label {
+  font-size: 12px;
+  letter-spacing: 0.6px;
+}
+.export-preview > p {
+  padding: 0 16px;
+}
+.console-footer {
+  min-height: 36px;
+}
+.footer-signals {
+  flex-wrap: wrap;
+}
+.primary,
+.secondary,
+.icon-button {
+  font-weight: 600;
+}
+.primary:active:not(:disabled),
+.secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.security-readiness dd {
+  white-space: normal;
+}
+.source-chip,
+.record-trigger,
+.details dd,
+.passport-id > span,
+.block-list {
+  overflow-wrap: anywhere;
+}
+.record-trigger {
+  min-width: 0;
+}
+.sidebar-collapse.icon-button {
+  padding: 0;
+  width: var(--control-height);
+  height: var(--control-height);
+}
+.creation-layout,
+.campaign-layout,
+.public-layout,
+.review-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+.evidence-review,
+.campaign-aside {
+  position: static;
+}
+@container workspace (min-width: 940px) {
+  .creation-layout,
+  .campaign-layout {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  }
+  .creation-aside {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .public-layout {
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  }
+  .review-layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr);
+  }
+  .evidence-review,
+  .campaign-aside {
+    position: sticky;
+    top: 4px;
+  }
+}

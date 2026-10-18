@@ -1,0 +1,151 @@
+# Gen6th Accord — deployment stack.
+#
+# PRODUCTION pulls the exact images CI built and signed (cosign) — never builds on
+# the host. On the server, from this directory:
+#   ./verify.sh --tag v1.2.3   # fail-closed: evidence + readiness + signatures
+#   docker compose -f docker-compose.yml --env-file ../.env up -d   # base only (no build override)
+#
+# LOCAL dev builds from source instead (docker-compose.override.yml is auto-merged):
+#   docker compose --env-file ../.env up -d --build
+#
+# Set BACKEND_IMAGE/FRONTEND_IMAGE in ../.env. Secrets come from ../.env (never this file
+# or the repo). Migrations run as a one-shot `migrate` service before the backend starts.
+
+name: gen6th-accord
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      # Loopback by default so a local `docker compose up` is NOT published to the LAN.
+      # On the server, set BIND_HOST=0.0.0.0 in .env to accept public traffic.
+      - "${BIND_HOST:-127.0.0.1}:80:80"
+      - "${BIND_HOST:-127.0.0.1}:443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE to the signed image ref — see README.md}
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      # In THIS stack Caddy always fronts the backend, so the proxy-appended X-Forwarded-For
+      # hop is trustworthy. Set here (topology knowledge), not in .env (which also serves
+      # proxy-less local runs, where the switch must stay off). See config.py.
+      TRUST_X_FORWARDED_FOR: "true"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import sys,urllib.request; sys.exit(0 if urllib.request.urlopen("http://127.0.0.1:8000/health",timeout=3).status==200 else 1)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # One-shot: applies Alembic migrations, then exits. Backend waits for success.
+  migrate:
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE to the signed image ref — see README.md}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    env_file: ../.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in ../.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in ../.env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in ../.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Telemetry stream for the compliance spine. Ephemeral + capped (the durable copy is the
+  # Postgres cold store), so no persistence is configured.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Background worker: drains the telemetry stream → cold store, then seals the audit chain.
+  # Without it the spine collects nothing, so it ships whenever the spine is enabled.
+  worker:
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE to the signed image ref — see README.md}
+    command: ["python", "-m", "accord.command.worker"]
+    restart: unless-stopped
+    env_file: ../.env
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    # The worker has no HTTP server, so the image's /health HEALTHCHECK doesn't apply.
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?set FRONTEND_IMAGE to the signed image ref — see README.md}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /app/.next/cache
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:

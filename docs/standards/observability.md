@@ -1,0 +1,44 @@
+# OBS — Observability standards
+
+What the system leaves behind, and whether it is enough to answer "what happened, and who did
+it" after the fact. Markers are explained in [`README.md`](README.md); the **Mechanism** column
+names what enforces a rule, and is empty when nothing does.
+
+## Logging
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| OBS-001 | Application logs are structured JSON through the shared logger, not `print`. A log nobody can query is a log nobody reads. | `[Review]` | — |
+| OBS-002 | A log line never contains a secret, a credential, a full token, or personal data. Log an identifier, not the subject. | `[Review]` | — |
+| OBS-003 | A caught exception is logged with the context needed to reconstruct it — what was attempted, on what, and why it failed. | `[Review]` | — |
+| OBS-004 | Log levels mean something: `error` is actionable, `warning` is suspicious, `info` is a lifecycle event. A log that is always noisy is always ignored. | `[Review]` | — |
+
+## Health and diagnostics
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| OBS-010 | A health endpoint answers cheaply and without authentication, and leaks no internal topology. | `[Review]` | — |
+| OBS-011 | A readiness signal reflects the dependencies the service actually needs, so a deploy does not shift traffic to an instance that cannot serve. | `[Review]` | — |
+| OBS-012 | A diagnostic prints what it found and how much it inspected. A check reporting success over zero inputs is indistinguishable from one that passed. | `[Review]` | — |
+
+## The durable record
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| OBS-020 | Every consequential action carries an explicit emit, detection, audit and compliance decision — including the deliberate decision that it needs none. | `[CI]` | `backend/accord/telemetry/registry.py` |
+| OBS-021 | Telemetry fails open. Losing an event must never fail the user's request; losing the request to record the event is the worse outcome. | `[Review]` | — |
+| OBS-022 | The audit chain is append-only and hash-linked. A record that can be edited afterwards is not evidence. | `[Review]` | — |
+| OBS-023 | A change to the audit chain is approved by the owner before merge — it is the record you would rely on after an incident. | `[CI]` | `scripts/meta_guard.py` |
+| OBS-024 | An action that cannot be reconstructed afterwards has no answer when someone asks what happened. Decide the record before shipping the action, not after the incident. | `[Review]` | — |
+
+## Trust: who observed it
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| OBS-030 | Every event records **who observed it** (`source`) as well as who acted. The distinction cannot be recovered from the other fields later, so it is stamped at emission. | `[CI]` | `backend/accord/telemetry/envelope.py` |
+| OBS-031 | A client-reported event never enters the audit chain. The chain records what this service observed; sealing a claim gives it the standing of an observation, permanently. | `[CI]` | `backend/accord/command/audit.py` |
+| OBS-032 | A client-reported event is never compliance evidence. An auditor asking "prove this happened" needs an observation, not a claim. | `[CI]` | `backend/tests/spine/test_coverage_guards.py` |
+| OBS-033 | A route that writes on the caller's behalf requires an authenticated principal. An event attributed to `system` because nobody was signed in is an event nobody can be asked about. | `[Review]` | — |
+| OBS-034 | A client supplies **what it saw, never who saw it**. Actor, session, IP and timestamp come from the request; a body that offers them is rejected outright, and the emitter overwrites attribution on any client-sourced event regardless of caller. | `[CI]` | `backend/tests/spine/test_client_events.py` |
+| OBS-035 | A client may not declare its own report `critical`. Severity drives alerting, so that is the ability to page the on-call rota from a browser tab. | `[CI]` | `backend/tests/spine/test_client_events.py` |
+| OBS-036 | Client-reported data is contained by **retention**, not immutability — it expires with the events window and never reaches the record that is never purged. | `[Review]` | — |

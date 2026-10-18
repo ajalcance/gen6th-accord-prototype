@@ -1,0 +1,134 @@
+# Gen6th Accord — Engineering Process and Control System
+
+**Applies to:** human and AI-assisted engineering.
+**Execution environment:** local development computer and GitHub Actions; never a live server.
+
+This is the map of how source control, CI, repository memory, coding-agent permissions, preventive
+experience, engineering standards, and release evidence fit together. It is a **summary**. The
+binding details live in the linked contracts, ADRs, workflows, and scripts. When this summary and
+executable behavior disagree, the executable behavior wins — see the source-of-truth order in
+[`../CLAUDE.md`](../CLAUDE.md).
+
+Governed by [`decisions/0006-engineering-process-and-control-system.md`](decisions/0006-engineering-process-and-control-system.md).
+
+## Enforcement markers
+
+Every control below is tagged with **how it is actually enforced** — no control claims automation
+it does not have:
+
+- **`[CI]`** — mechanically enforced by a gate that runs today.
+- **`[Review]`** — depends on human judgment in review; not automated.
+- **`[Phase gate — vX.Y]`** — planned for a named release; **not yet enforced**.
+- **`[Production blocker]`** — registered in `scripts/prod_readiness.py`; a strict release is denied
+  until objective closure evidence exists.
+
+> This document is delivered in phases. A `[Phase gate]` marker becomes `[CI]`/`[Review]` only when
+> the mechanism actually lands — that is the point of the marker.
+
+## 1. Operating principles
+
+AI produces much of the implementation and a human does not inspect every line, so human attention
+is concentrated on **authority and policy** changes while routine work is checked mechanically.
+
+1. `main` is protected, linear, and always releasable.
+2. Routine development happens on short-lived branches and reaches `main` only through a PR.
+3. One required aggregate check, `ci-complete`, fails unless every applicable gate succeeds.
+4. The repository — not a chat transcript — is the durable project memory.
+5. Prior lessons become proportionate controls through an explicit enforcement ladder.
+6. A release promotes already-reviewed, already-built, signed bytes and their evidence; it does not
+   rebuild arbitrary source.
+
+## 2. Control map
+
+| Area | Control | Enforcement |
+|---|---|---|
+| Git | Protected `main`, PR-only changes, linear history, no force-push or branch deletion, squash merge | `[CI]` ruleset |
+| Git | Signed commits | `[Review]` opt-in — see [`../ONBOARDING.md`](../ONBOARDING.md) |
+| CI | Always-on hygiene (gitleaks, private-key, EOF/whitespace) | `[CI]` |
+| CI | Blocking SAST (Semgrep dangerous-ops) + advisory community scan | `[CI]` |
+| CI | Path-aware backend/frontend/docs-site suites | `[CI]` |
+| CI | Static policy guards, one list — `make policy`, which CI invokes rather than relisting | `[CI]` |
+| CI | **Guard coverage** — every guard has a fault test and something that invokes it | `[CI]` (`check_guard_coverage`) |
+| CI | Unicode hazards — no bidirectional, zero-width or invisible character in any source file | `[CI]` (`check_unicode_hazards`) |
+| CI | The harness itself is linted — the guards, their tests and the session hooks | `[CI]` (`make harness`) |
+| CI | Anti-weakening ratchet — suppressions, missing tests, guard-file edits, sensitive paths, lowered thresholds | `[CI]` (`meta_guard`) |
+| CI | **Guard fault tests** — negative tests proving each guard can still fail | `[CI]` (`tests/guards/`) |
+| CI | Required aggregate `ci-complete` | `[CI]` |
+| CI | Semantic correctness of a change | `[Review]` — human judgment |
+| CI | Workflow linting (actionlint, pinned + checksummed) and shell linting (shellcheck) | `[CI]` |
+| Release | Tag must be an ancestor of `main`; cosign-signed images by digest; verified on the host by `deploy/verify.sh` | `[CI]` |
+| Release | Readiness verdict recorded inside the signed evidence and read from there, never re-scanned | `[CI]` (`release_evidence`) |
+| Release | Build-once candidate, SBOM, digest-pinned signed evidence, promote-without-rebuild | `[CI]` (`release.yml` + `release_evidence`) |
+| Release | Fail-closed preflight before a tag is cut — `make release-preflight TAG=vX.Y.Z` | `[CI]` (`release_preflight`, also run in the release `guard` job) |
+| Release | Production readiness holds (register your own: IAM, approval separation, operational readiness) | `[CI]` — `--strict` runs in the release preflight; the register ships **empty**, see §6 |
+| Memory | Repository precedence + source-of-truth order | `[CI]` (`dod-check`) + `[Review]` (prose accuracy) |
+| Memory | Per-PR memory-impact declaration, cross-checked against the diff | `[CI]` (`pr_declaration`) |
+| Memory | ADR numbering/indexing + newest-first LESSONS ordering | `[CI]` (`dod-check`) |
+| Memory | `make context` — session snapshot derived, never persisted | `[Review]` — a diagnostic, not a gate |
+| Agent | Routine work allowed; policy/release/destructive/privileged/Docker/external mutations **ask**; secret reads denied; `--admin` blocked by hook | `[Review]` — a strong default in `.claude/settings.json`, but project settings can be overridden by higher-precedence scopes; the fail-closed enforcement is the ruleset + `ci-complete` |
+| Experience | Diff-aware lesson retrieval (`make risk-context`) | `[Review]` — advisory; never overrides code or tests |
+| Experience | Registry honesty — a `guard` rung must name a mechanism that exists | `[CI]` (`risk_context --validate`) |
+| Experience | Promotion up the ladder needs the owner (`guardrail-change`) | `[CI]` (`meta_guard`) |
+| Standards | Stable full-stack rule IDs (`BE`/`API`/`FE`/`TA`/`SEC`/`OBS`/`REL`) in [`standards/`](standards/README.md) | `[Review]` — each rule additionally carries its own marker |
+| Standards | Marker honesty — a `[CI]` rule must name a mechanism that exists, and every cited rule id must resolve | `[CI]` (`standards_check`) |
+
+## 3. Branch and PR process
+
+Trunk-based ([`decisions/0005-trunk-based-branching.md`](decisions/0005-trunk-based-branching.md)):
+
+- `main` is the only long-lived branch; work branches from a synchronized `main`.
+- Accepted prefixes: `feat/*`, `fix/*`, `security/*`, `refactor/*`, `docs/*`, `chore/*`.
+- Branches are short-lived and hold one logical change; PRs squash-merge into `main`.
+- Release tags are cut from protected `main`; there is no permanent `develop` branch.
+
+### Protected-change labels
+
+The agent does not self-approve changes to guard machinery, dependencies, or release controls.
+These owner-applied labels are **exceptional evidence, not a routine way to make CI green** — a
+blocked change fixes its underlying issue first:
+
+| Label | Meaning | Enforcement |
+|---|---|---|
+| `guardrail-change` | a deliberate, reviewed change to a guard-defining file | `[CI]` (`meta_guard`) |
+| `allow-suppressions` | a justified new `# noqa` / `# type: ignore` / … | `[CI]` (`meta_guard`) |
+| `no-tests-needed` | a pure refactor/rename with no behavior change | `[CI]` (`meta_guard`) |
+| `sensitive-change-approved` | a reviewed change to a sensitive path (migrations, auth, audit chain) | `[CI]` (`meta_guard`) |
+| `allow-exemptions` | a justified threshold move or scanner-exemption growth | `[CI]` (`meta_guard`) |
+| `release-blocker` | an owner hold that denies release — applied to an **issue**, not a PR; while one is open the preflight refuses | `[CI]` (`release_preflight`) |
+
+## 4. Source of truth
+
+When records disagree, trust them in this order (full statement in [`../CLAUDE.md`](../CLAUDE.md)):
+
+1. Running code, migrations, tests, and live GitHub / repository settings.
+2. [`architecture/current-state.md`](architecture/current-state.md) — what exists now.
+3. [`decisions/`](decisions) — why durable decisions were made.
+4. [`PLAN.md`](PLAN.md) — completed, current, and next work.
+5. [`LESSONS.md`](LESSONS.md) — dated, reusable learning and gotchas.
+6. [`../CHANGELOG.md`](../CHANGELOG.md) — user-visible history.
+7. Assistant / session notes — hints only; reverify before use.
+
+Duplicating a repository fact into assistant memory creates a competing truth that can drift, so
+each record has exactly one purpose.
+
+## 5. Production readiness
+
+`scripts/prod_readiness.py` is the mechanism for holding a release open on a known gap: mark the
+stand-in in code with `# PROD-BLOCKER(<id>): why`, register it, and the two are checked against each
+other in both directions.
+
+**It ships with an empty register**, because a fresh project has no stubs yet — so a `[Production
+blocker]` marker anywhere in this document means *"the mechanism exists and this is where you would
+register that hold"*, **not** "a hold is currently active". Register your own as they appear (a
+stubbed auth layer, `CHANGE_ME` secrets, a mutable image tag). See [`../ONBOARDING.md`](../ONBOARDING.md).
+
+The register is **advisory during development and blocking at the release boundary**: open
+blockers do not redden every PR (a project would be red for its whole build phase, and everyone
+would learn to ignore it), but `make release-preflight TAG=vX.Y.Z` runs it with `--strict`, so a
+release does not happen while one is open.
+
+## 6. Definition of Done
+
+The binding checklist is [`../CLAUDE.md`](../CLAUDE.md) §2. In short: green `make check`, updated
+PLAN / LESSONS / current-state, an ADR when a decision changes, a CHANGELOG entry, and a
+Conventional Commit — nothing is "done" until the written record matches reality.

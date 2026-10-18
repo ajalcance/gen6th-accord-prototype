@@ -1,0 +1,90 @@
+"""The event envelope (schema v1) — the one shape every telemetry event takes."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import Request
+
+from accord.config import get_settings
+
+# Envelope schema version. The policy is ADDITIVE-OPEN: new OPTIONAL fields (like `source`,
+# added after v1 shipped) do not bump this, and every consumer must tolerate fields it does not
+# know. Bump it only for a breaking change — a field removed, renamed, or given new semantics —
+# and then the consumer must handle both versions explicitly. A bump-per-addition policy sounds
+# stricter but in practice teaches consumers to ignore the version field entirely.
+SCHEMA_V = 1
+SEV_INFO = "info"
+SEV_WARN = "warn"
+SEV_CRITICAL = "critical"
+# Weakest first. Detection rules compare against this, so "is severity X at least Y" has one
+# definition rather than one per call site.
+SEVERITY_ORDER: tuple[str, ...] = (SEV_INFO, SEV_WARN, SEV_CRITICAL)
+ACTOR_SYSTEM = "system"
+ACTOR_HUMAN = "human"
+
+# WHO OBSERVED THE FACT — the trust axis, distinct from WHO ACTED (the actor).
+#
+# `server` means this service observed it directly. `client` means a browser or app REPORTED it:
+# the actor is authenticated and the timestamp and IP are ours, but the claim itself is only as
+# honest as the code that sent it. That distinction cannot be recovered later from the fields, so
+# it is recorded at emission. `command.audit.seal_new` refuses to seal anything but `server`.
+SOURCE_SERVER = "server"
+SOURCE_CLIENT = "client"
+
+
+def make_event(
+    *,
+    category: str,
+    action: str,
+    outcome: str,
+    severity: str = SEV_INFO,
+    actor_type: str = ACTOR_SYSTEM,
+    actor_id: str | None = None,
+    sid: str | None = None,
+    tenant_id: str | None = None,
+    resource_type: str | None = None,
+    resource_id: str | None = None,
+    ip: str | None = None,
+    correlation_id: str | None = None,
+    source: str = SOURCE_SERVER,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a schema-v1 envelope dict (JSON-ready)."""
+    return {
+        "event_id": uuid.uuid4().hex,
+        "ts": datetime.now(UTC).isoformat(),
+        "schema_v": SCHEMA_V,
+        "actor": {"type": actor_type, "id": actor_id, "sid": sid},
+        "tenant_id": tenant_id,
+        "category": category,
+        "action": action,
+        "outcome": outcome,
+        "severity": severity,
+        "resource": {"type": resource_type, "id": resource_id},
+        "correlation_id": correlation_id,
+        "ip": ip,
+        "source": source,
+        "metadata": metadata or {},
+    }
+
+
+def client_ip(request: Request) -> str | None:
+    """The request's client IP, resistant to header forgery.
+
+    ``X-Forwarded-For`` is an ordinary request header — any caller can send one, so trusting it
+    unconditionally lets an authenticated client choose the IP recorded on its own events, on a
+    field this module documents as server-observed. It is honored only when
+    ``trust_x_forwarded_for`` is enabled (set it exactly when a trusted reverse proxy — the
+    deploy module's Caddy — fronts this service), and then the **last** hop is used: the one
+    hop appended by our own proxy. Earlier hops are whatever the client claimed.
+
+    Without a trusted proxy the peer address is the only value the server itself observed.
+    """
+    if get_settings().trust_x_forwarded_for:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.rsplit(",", 1)[-1].strip()
+    return request.client.host if request.client else None

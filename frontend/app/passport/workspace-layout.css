@@ -1,0 +1,138 @@
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workspace-actions button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-muted);
+}
+.workspace-actions .primary {
+  color: var(--color-accent);
+}
+.workspace-actions button:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text);
+}
+.workspace-console .topbar {
+  min-height: 48px;
+  flex-wrap: wrap;
+  padding: 6px 20px;
+}
+.workspace-console main {
+  padding: 20px;
+}
+.workspace-console h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.workspace-gallery-toolbar,
+.workspace-record-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.workspace-gallery-toolbar h1,
+.workspace-record-toolbar h1 {
+  margin-right: auto;
+}
+.workspace-record-toolbar .saved-search {
+  margin: 0;
+  gap: 8px;
+}
+.workspace-console .search-field {
+  width: 200px;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  gap: 8px;
+}
+.workspace-console .search-field input[type="search"] {
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.workspace-console .saved-search .search-field {
+  flex: 0 1 200px;
+}
+.gallery-display.segmented-control {
+  padding: 2px;
+  gap: 2px;
+}
+.gallery-display button {
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  width: 28px;
+  padding: 4px;
+}
+.saved-grid.saved-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.saved-list .saved-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+.saved-list .card-open {
+  margin: 0 0 0 auto;
+}
+.workspace-console .empty-state {
+  padding: 32px 20px;
+}
+.workspace-console .empty-state p:last-child {
+  margin-bottom: 0;
+}
+.workspace-record-toolbar .icon-button {
+  min-height: 34px;
+  padding: 6px;
+}
+@container workspace (max-width: 700px) {
+  .workspace-gallery-toolbar h1,
+  .workspace-record-toolbar h1 {
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+  .workspace-console .search-field {
+    flex: 1;
+  }
+  .saved-list .saved-card {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .workspace-actions button,
+  .gallery-display button,
+  .workspace-record-toolbar .icon-button,
+  .workspace-console .search-field {
+    min-height: 44px;
+  }
+  .gallery-display button {
+    width: 44px;
+  }
+  .workspace-console .breadcrumb {
+    display: flex;
+  }
+  .workspace-console .topbar {
+    justify-content: space-between;
+  }
+  .workspace-console main {
+    padding: 16px;
+  }
+}
+@media (max-width: 480px) {
+  .workspace-actions .action-label {
+    display: none;
+  }
+}

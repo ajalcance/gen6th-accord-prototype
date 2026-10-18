@@ -1,0 +1,50 @@
+.performer-identity {
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.performer-identity h2,
+.credit-entries h3 {
+  margin: 0;
+}
+.performer-identity .saved-fields {
+  margin: var(--space-3) 0;
+}
+.performer-identity dd {
+  overflow-wrap: anywhere;
+}
+.credit-entries,
+.credit-editor,
+.credit-fields {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.credit-fields {
+  grid-column: 1 / -1;
+}
+.credit-fields > button {
+  justify-self: start;
+}
+.prepared-write-form .credit-row {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.credit-row > :is(details, .credit-evidence, button) {
+  grid-column: 1 / -1;
+}
+.credit-row details label {
+  margin-top: var(--space-3);
+}
+.credit-evidence ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.credit-evidence button {
+  overflow-wrap: anywhere;
+}

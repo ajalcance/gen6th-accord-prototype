@@ -1,0 +1,276 @@
+.booklet-dialog {
+  color-scheme: light;
+  --ink: #101e4d;
+  --blue: #628da9;
+  --paper: #f3f2eb;
+  width: min(1960px, 96vw);
+  max-width: none;
+  max-height: 94dvh;
+  padding: 22px;
+  border: 1px solid #b2bec4;
+  border-radius: 18px;
+  background: #f6f7f4;
+  color: var(--ink);
+  overflow: auto;
+}
+.booklet-dialog::backdrop {
+  background: #edf0edd9;
+}
+.booklet-toolbar,
+.booklet-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.booklet-toolbar h2 {
+  color: #101e4d;
+  font:
+    24px Georgia,
+    serif;
+  margin: 0;
+}
+.booklet-dialog button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid #8da4b3;
+  border-radius: 5px;
+  background: #fffefa;
+  color: #101e4d;
+}
+.booklet-dialog :is(button, a):focus-visible {
+  outline: 3px solid #297caa;
+  outline-offset: 4px;
+}
+.booklet-status,
+.booklet-explanation {
+  font:
+    12px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #51677b;
+}
+.booklet-status p {
+  margin: 0;
+}
+.booklet-access {
+  margin-bottom: 14px;
+}
+.booklet-access > button {
+  min-height: 44px;
+}
+:where(.booklet-dialog) .passport-booklet {
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  aspect-ratio: 1.8;
+  border: 1px solid #b2bec4;
+  border-radius: 29px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: 0 8px 28px #2e475a12;
+}
+:where(.booklet-dialog) .booklet-page {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 44px 48px 26px;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse at center, #faf9f4d9 0 48%, #f0f2ec33 82%),
+    url("/passport-booklet/paper-security.svg") center / 100% 100%,
+    var(--paper);
+  font-family: Georgia, "Times New Roman", serif;
+}
+:where(.booklet-dialog) .booklet-page::before {
+  position: absolute;
+  content: "";
+  inset: 12px;
+  border: 1px solid #99b9c36b;
+  border-radius: 18px;
+  pointer-events: none;
+  z-index: -1;
+}
+:where(.booklet-dialog) .identity-page {
+  box-shadow: inset -15px 0 18px -17px #526b7b77;
+  border-right: 1px solid #b8bfc0;
+}
+:where(.booklet-dialog) .record-page {
+  box-shadow: inset 15px 0 18px -17px #526b7b66;
+}
+:where(.booklet-dialog) .portrait-watermark {
+  position: absolute;
+  top: 25%;
+  right: -8%;
+  width: 64%;
+  height: 57%;
+  object-fit: cover;
+  object-position: center 30%;
+  opacity: 0.065;
+  mix-blend-mode: multiply;
+  mask-image: radial-gradient(ellipse at center, black 10%, transparent 72%);
+  pointer-events: none;
+  z-index: -1;
+}
+:where(.booklet-dialog) .authority-kicker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  font-size: clamp(12px, 1.25vw, 23px);
+  letter-spacing: 0.18em;
+  margin: 5px 10px 23px;
+  white-space: nowrap;
+}
+:where(.booklet-dialog) .authority-kicker span {
+  width: 22%;
+  height: 1px;
+  background: #7ca7b9;
+  box-shadow: 0 4px #7ca7b950;
+}
+:where(.booklet-dialog) .identity-heading {
+  text-align: center;
+}
+:where(.booklet-dialog) .identity-heading h3 {
+  text-transform: uppercase;
+  font-size: clamp(28px, 3vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  margin: 0 0 10px;
+}
+:where(.booklet-dialog) .identity-state {
+  font-size: clamp(12px, 1.5vw, 29px);
+  letter-spacing: 0.17em;
+  margin: 0;
+}
+:where(.booklet-dialog) .booklet-rule {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  color: #3b749a;
+  margin: 15px 0 25px;
+}
+:where(.booklet-dialog) .booklet-rule > span {
+  height: 1px;
+  background: #6a9cb7;
+  flex: 1;
+  box-shadow: 0 3px #6a9cb740;
+}
+:where(.booklet-dialog) .booklet-rule > svg {
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  fill: #d3e4e9;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+:where(.booklet-dialog) .identity-heading .booklet-rule {
+  max-width: 56%;
+  margin: 10px auto 27px;
+}
+:where(.booklet-dialog) .identity-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.04fr;
+  gap: 30px;
+  min-width: 0;
+  flex: 1;
+}
+:where(.booklet-dialog) .booklet-portrait {
+  min-width: 0;
+  border: 2px solid #ecf1ee;
+  border-radius: 25px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #9db5c4;
+  align-self: stretch;
+  background: #e1e5e4;
+}
+:where(.booklet-dialog) .booklet-portrait > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  aspect-ratio: 0.73;
+  object-fit: cover;
+  object-position: center 24%;
+}
+:where(.booklet-dialog) .empty-portrait {
+  display: flex;
+  min-height: 360px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 18px;
+  border: 1px dashed #91a7b2;
+  color: #647b8d;
+  text-align: center;
+}
+:where(.booklet-dialog) .empty-portrait > span {
+  font-size: 60px;
+  font-weight: 400;
+}
+:where(.booklet-dialog) .empty-portrait p {
+  font:
+    14px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+:where(.booklet-dialog) .identity-fields {
+  margin: 14px 0 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 19px;
+}
+:where(.booklet-dialog) .identity-fields > div {
+  border-bottom: 1px solid #8babb63d;
+  padding-bottom: 13px;
+}
+:where(.booklet-dialog) .identity-fields > div:last-child {
+  border: 0;
+  padding-bottom: 0;
+}
+:where(.booklet-dialog) .identity-fields dt {
+  font:
+    500 clamp(10px, 1.04vw, 20px)/1.3 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 7px;
+}
+:where(.booklet-dialog) .identity-fields dd {
+  margin: 0;
+  font:
+    500 clamp(14px, 1.42vw, 28px)/1.3 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  overflow-wrap: anywhere;
+}
+:where(.booklet-dialog) .identity-fields .field-note {
+  font-size: 10px;
+  font-weight: 400;
+  color: #5c7282;
+  margin-top: 4px;
+}
+:where(.booklet-dialog) .machine-line {
+  border-top: 1px solid #7297b044;
+  padding-top: 18px;
+  margin: 27px 5px 0;
+  font:
+    clamp(11px, 1.38vw, 25px)/1.7 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  letter-spacing: 0.025em;
+  overflow-wrap: anywhere;
+}

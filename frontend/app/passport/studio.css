@@ -1,0 +1,205 @@
+.studio {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+}
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  border-right: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-subtle);
+}
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -1px;
+}
+.brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+}
+.brand-dot {
+  font-size: 10px;
+  align-self: end;
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  letter-spacing: 0;
+}
+.workspace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.workspace-icon,
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-strong);
+  width: 34px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+.workspace small {
+  display: block;
+  margin-top: var(--space-1);
+}
+.nav-label {
+  margin-left: var(--space-3);
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  color: var(--color-muted);
+}
+.nav-item,
+.utility-nav button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--control-height);
+  margin: 2px 0;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  gap: var(--space-3);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.nav-item:hover,
+.utility-nav button:hover {
+  background: var(--color-surface);
+}
+.nav-item.active {
+  background: var(--color-raised);
+  color: var(--color-accent);
+  border-color: var(--color-border);
+}
+.count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.section-label {
+  margin-top: var(--space-5);
+}
+.sidebar-bottom {
+  margin-top: auto;
+  padding: var(--space-4) var(--space-3) 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  line-height: 1.8;
+}
+.sidebar-bottom p {
+  margin: var(--space-4) 0;
+}
+.sidebar-bottom small {
+  display: block;
+  margin-top: var(--space-2);
+}
+.main-shell {
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--layer-header);
+  min-height: var(--header-height);
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--color-canvas);
+}
+.breadcrumb {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.breadcrumb > span {
+  padding: 0 var(--space-3);
+  color: var(--color-border-strong);
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.command-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-muted);
+}
+kbd {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: 11px var(--font-mono);
+}
+main {
+  max-width: var(--content-width);
+  padding: var(--space-6);
+  container-type: inline-size;
+  container-name: workspace;
+  margin: 0 auto;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-top: var(--space-8);
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-5);
+}
+.record-trigger {
+  flex-shrink: 0;
+  max-width: 280px;
+  text-align: left;
+}
+.record-trigger small {
+  display: block;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.page-heading .subtitle {
+  margin-top: var(--space-2);
+}

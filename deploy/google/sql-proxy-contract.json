@@ -1,0 +1,76 @@
+{
+  "contract_version": 1,
+  "kind": "preparation-contract-not-a-deployment-manifest",
+  "project": "gen6th-accord-production",
+  "region": "asia-southeast1",
+  "instance": "gen6th-accord-production:asia-southeast1:accord-prod-db",
+  "database": "appdb",
+  "image": {
+    "reference": null,
+    "status": "pending-reviewed-digest-and-supply-chain-verification",
+    "require_digest": true,
+    "require_release_evidence": true
+  },
+  "sql_listener": { "address": "127.0.0.1", "port": 5432 },
+  "health_listener": { "address": "0.0.0.0", "port": 9090, "public_ingress": false },
+  "base_arguments": [
+    "--private-ip",
+    "--address=127.0.0.1",
+    "--port=5432",
+    "--health-check",
+    "--http-address=0.0.0.0",
+    "--http-port=9090",
+    "--lazy-refresh",
+    "--max-sigterm-delay=8s",
+    "--min-sigterm-delay=2s",
+    "--exit-zero-on-sigterm",
+    "gen6th-accord-production:asia-southeast1:accord-prod-db"
+  ],
+  "service_profile": {
+    "max_connections": 2,
+    "additional_arguments": ["--max-connections=2"],
+    "startup_probe": { "path": "/startup", "port": 9090, "period_seconds": 2, "timeout_seconds": 1, "failure_threshold": 30 },
+    "liveness_probe": { "path": "/liveness", "port": 9090, "period_seconds": 10, "timeout_seconds": 1, "failure_threshold": 3 },
+    "dependent_container_start": "only-after-successful-proxy-startup-probe"
+  },
+  "identities": {
+    "api": "accord-api@gen6th-accord-production.iam.gserviceaccount.com",
+    "reference": "accord-reference@gen6th-accord-production.iam.gserviceaccount.com",
+    "compliance": "accord-compliance@gen6th-accord-production.iam.gserviceaccount.com",
+    "migration": "accord-migration@gen6th-accord-production.iam.gserviceaccount.com"
+  },
+  "credentials": {
+    "proxy": "selected-runtime-workload-identity",
+    "database": "separate-confined-login-from-private-runtime-configuration",
+    "downloaded_service_account_keys": false,
+    "operator_login_in_application": false
+  },
+  "migration_profile": {
+    "pool": "NullPool",
+    "max_connections": 1,
+    "operator_only": true,
+    "additional_arguments": ["--max-connections=1", "--quitquitquit", "--admin-port=9091"],
+    "admin_listener": "loopback-only",
+    "runner_module": "accord.db.migration_job",
+    "operation": "alembic-python-api-upgrade-explicit-allowlisted-revision",
+    "operator_database_login": "accord_migrator",
+    "startup_wait_seconds": 60,
+    "startup_url": "http://127.0.0.1:9090/startup",
+    "connection_timeout_seconds": 5,
+    "shutdown": "finally-request-after-configuration-startup-or-migration-success-or-failure",
+    "shutdown_method": "POST",
+    "shutdown_url": "http://127.0.0.1:9091/quitquitquit",
+    "shutdown_deadline_seconds": 3,
+    "http_redirects_and_environment_proxies": false,
+    "failure_reporting": "fixed-primary-phase-plus-separate-shutdown-failure-no-exception-content",
+    "requires_runner_implementation": false,
+    "requires_container_exit_acceptance": true
+  },
+  "remaining": [
+    "verified-proxy-image-and-reviewed-release-integration",
+    "runtime-specific-SQL-logins-and-grants",
+    "private-VPC-egress-and-live-authenticated-TLS-acceptance",
+    "worker-pool-and-migration-job-lifecycle-adaptation",
+    "measured-container-resources-and-revision-overlap-capacity"
+  ]
+}

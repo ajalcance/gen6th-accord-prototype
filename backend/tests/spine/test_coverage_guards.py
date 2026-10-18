@@ -1,0 +1,173 @@
+"""Coverage guards: every emitted action has a detection, audit, and compliance decision.
+
+These are what make "audit/monitor/compliance-map everything" mechanical: a new action can't
+ship without a decision in all four registries (telemetry + these three).
+"""
+
+from __future__ import annotations
+
+from typing import get_args
+
+from accord.api.routes_client_events import ClientEvent
+from accord.command.audit import AUDIT_EXEMPT, AUDITABLE_ACTIONS, SEALABLE_SOURCE
+from accord.command.controls import ACTION_CONTROLS, CONTROL_EXEMPT, CONTROLS_BY_ID
+from accord.command.models import Event
+from accord.command.rules import BASELINE_ONLY, DEFAULT_RULES, RULES_BY_ID
+from accord.telemetry.envelope import (
+    SEVERITY_ORDER,
+    SOURCE_CLIENT,
+    SOURCE_SERVER,
+    make_event,
+)
+from accord.telemetry.registry import CLIENT_ACTIONS, COVERAGE, NON_ROUTE_ACTIONS
+
+_EMITTED = {a for actions in COVERAGE.values() for a in actions} | NON_ROUTE_ACTIONS
+
+
+def test_every_action_has_a_detection_decision() -> None:
+    ruled: set[str] = set()
+    for rule in DEFAULT_RULES:
+        ruled.update(rule.actions)
+    undecided = _EMITTED - ruled - BASELINE_ONLY
+    assert not undecided, (
+        "Actions with no detection decision (add a Rule or list in BASELINE_ONLY): "
+        f"{sorted(undecided)}"
+    )
+
+
+def test_every_action_has_an_audit_decision() -> None:
+    undecided = _EMITTED - AUDITABLE_ACTIONS - AUDIT_EXEMPT
+    assert not undecided, (
+        "Actions with no audit decision (add to AUDITABLE_ACTIONS or AUDIT_EXEMPT): "
+        f"{sorted(undecided)}"
+    )
+
+
+def test_every_action_has_a_compliance_decision() -> None:
+    undecided = _EMITTED - set(ACTION_CONTROLS) - CONTROL_EXEMPT
+    assert not undecided, (
+        "Actions with no compliance decision (map in ACTION_CONTROLS or add to CONTROL_EXEMPT): "
+        f"{sorted(undecided)}"
+    )
+
+
+def test_no_stale_decisions() -> None:
+    assert not (BASELINE_ONLY - _EMITTED), "BASELINE_ONLY names actions nothing emits"
+    assert not (set(AUDITABLE_ACTIONS) - _EMITTED), "AUDITABLE_ACTIONS names actions nothing emits"
+    assert not (set(ACTION_CONTROLS) - _EMITTED), "ACTION_CONTROLS names actions nothing emits"
+
+
+def test_control_mappings_reference_real_controls() -> None:
+    for action, ids in ACTION_CONTROLS.items():
+        for cid in ids:
+            assert cid in CONTROLS_BY_ID, f"{action} maps to unknown control {cid}"
+
+
+# --- The client/server trust boundary (docs/decisions/0012) -----------------------------------
+
+
+def test_no_client_reported_action_is_auditable() -> None:
+    """The chain records what this service observed, not what a browser claimed.
+
+    Sealing a client report would give a claim the same cryptographic standing as an
+    observation — and the chain is never purged, so the mistake is permanent.
+    """
+    sealed = CLIENT_ACTIONS & AUDITABLE_ACTIONS
+    assert not sealed, (
+        "Client-reported actions listed as auditable: "
+        f"{sorted(sealed)}. A client-reported event is evidence that something was SAID, not "
+        "that it happened. Keep them in AUDIT_EXEMPT."
+    )
+
+
+def test_no_client_reported_action_is_compliance_evidence() -> None:
+    """An auditor asking 'prove this happened' needs an observation, not a claim."""
+    mapped = CLIENT_ACTIONS & set(ACTION_CONTROLS)
+    assert not mapped, f"Client-reported actions mapped to controls: {sorted(mapped)}"
+
+
+def test_client_actions_and_only_client_actions_use_the_client_prefix() -> None:
+    """The `client.` prefix and CLIENT_ACTIONS membership must coincide, both directions.
+
+    (An earlier guard here asserted CLIENT_ACTIONS <= _EMITTED — which holds by construction,
+    because the client-events COVERAGE row is built from CLIENT_ACTIONS. A test that cannot
+    fail is a green tick over nothing, so it was replaced with this falsifiable invariant:
+    exemption unions and the failure-surge exclusion reason about client actions as a set, and
+    a server action named `client.*` — or a client action named anything else — would make
+    every such audit misleading.)
+    """
+    not_prefixed = {action for action in CLIENT_ACTIONS if not action.startswith("client.")}
+    assert not not_prefixed, f"client-reported actions must use the client. prefix: {not_prefixed}"
+    masquerading = {action for action in _EMITTED - CLIENT_ACTIONS if action.startswith("client.")}
+    assert (
+        not masquerading
+    ), f"server-observed actions must not use the client. prefix: {masquerading}"
+
+
+def test_the_registry_is_not_vacuously_empty() -> None:
+    """Every assertion above passes trivially against an empty set. It must not be empty."""
+    assert CLIENT_ACTIONS, "CLIENT_ACTIONS is empty — the boundary guards check nothing"
+
+
+def test_only_server_observed_events_are_sealable() -> None:
+    assert SEALABLE_SOURCE == SOURCE_SERVER
+
+
+def test_the_event_model_default_matches_the_envelope() -> None:
+    """models.py hardcodes the default (a pure-data module stays off the emitter's redis/auth
+    import chain — there is no import cycle, envelope.py is a leaf); the two must not drift."""
+    assert Event.__table__.c.source.default.arg == SOURCE_SERVER
+
+
+def test_an_event_is_server_sourced_unless_it_says_otherwise() -> None:
+    """The safe value is the default: forgetting the field must not mark data untrusted."""
+    assert make_event(category="c", action="a", outcome="success")["source"] == SOURCE_SERVER
+    assert (
+        make_event(category="c", action="a", outcome="success", source=SOURCE_CLIENT)["source"]
+        == SOURCE_CLIENT
+    )
+
+
+def test_no_rule_can_be_triggered_by_an_event_a_client_can_produce() -> None:
+    """A client picks its own action, outcome and (capped) severity within a known envelope.
+
+    Any rule matching something inside that envelope is an alert a browser tab can hold high at
+    will — the capability the severity cap denies, arriving instead through the action or
+    outcome dimension. Rules deliberately scoped to client actions are the exception and the
+    point (client-error-surge); this bans the rest.
+
+    The check derives what a client can produce from the ROUTE's own model, so widening the
+    endpoint (another allowed severity, another outcome) re-evaluates every rule automatically
+    — rather than silently making a previously unreachable rule reachable.
+    """
+    claimable_severities = set(get_args(ClientEvent.model_fields["severity"].annotation))
+    claimable_outcomes = set(get_args(ClientEvent.model_fields["outcome"].annotation))
+
+    reachable = []
+    for rule in DEFAULT_RULES:
+        scoped_to_client = bool(rule.actions) and set(rule.actions) <= CLIENT_ACTIONS
+        if scoped_to_client:
+            continue  # deliberate: a rule about client reports
+        actions = set(rule.actions) or (CLIENT_ACTIONS - set(rule.exclude_actions))
+        if not (actions & CLIENT_ACTIONS):
+            continue  # cannot see a client action at all
+        if rule.outcomes and not (set(rule.outcomes) & claimable_outcomes):
+            continue  # needs an outcome no client can claim
+        if rule.min_severity is not None:
+            floor = SEVERITY_ORDER.index(rule.min_severity)
+            if not any(SEVERITY_ORDER.index(s) >= floor for s in claimable_severities):
+                continue  # needs a severity above the client cap
+        reachable.append(rule.id)
+
+    assert not reachable, (
+        f"rules a client can trigger at will: {reachable}. Scope the rule to specific actions, "
+        f"add the client actions to exclude_actions, or narrow it so no client-claimable "
+        f"severity/outcome matches."
+    )
+
+
+def test_the_client_error_rule_stays_scoped_to_client_actions() -> None:
+    """The counterpart: the rule that SHOULD see client reports must still be scoped to them,
+    so the exclusion above never silently empties it."""
+    rule = RULES_BY_ID["client-error-surge"]
+    assert set(rule.actions) <= CLIENT_ACTIONS and rule.actions

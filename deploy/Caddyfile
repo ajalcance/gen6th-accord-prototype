@@ -1,0 +1,32 @@
+# Gen6th Accord — reverse proxy.
+#
+# `tls internal` uses Caddy's local CA (self-signed) — works for an IP or a
+# not-yet-DNS host. When a real domain lands, delete the `tls internal` line and
+# Caddy provisions Let's Encrypt automatically for `accord.gen6th.com`.
+
+accord.gen6th.com {
+	tls internal
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Backend API.
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else: the frontend.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+}

@@ -1,0 +1,77 @@
+# Cloud Run Job: one allowlisted Alembic upgrade through the private Cloud SQL Auth Proxy sidecar.
+# Replace BACKEND_IMAGE_DIGEST and PROXY_IMAGE_DIGEST with the lines printed by build-backend-owner.sh.
+# Apply: gcloud run jobs replace accord-migrate-job.yaml --project=gen6th-accord-production --region=asia-southeast1
+# Execute: gcloud run jobs execute accord-migrate --wait --project=... --region=...
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: accord-provision
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/network-interfaces: '[{"network":"accord-prod-vpc","subnetwork":"accord-prod-sg"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+        run.googleapis.com/container-dependencies: '{"provision":["cloud-sql-proxy"]}'
+    spec:
+      taskCount: 1
+      template:
+        spec:
+          serviceAccountName: accord-migration@gen6th-accord-production.iam.gserviceaccount.com
+          maxRetries: 0
+          timeoutSeconds: 900
+          containers:
+            - name: provision
+              image: asia-southeast1-docker.pkg.dev/gen6th-accord-production/accord-images/accord-backend@sha256:49e1bf4ffbcb72719f6c1153e0d3185e9caec4ab762e602f5185432273c2684d
+              command: ["python"]
+              args: ["-m", "accord.personas.provision", "--help"]
+              env:
+                - name: ENVIRONMENT
+                  value: production
+                - name: DATABASE_TRANSPORT
+                  value: cloud_sql_proxy
+                - name: SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: accord-prod-app-secret
+                      key: "1"
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: accord-prod-provisioner-database-url
+                      key: "1"
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 512Mi
+            - name: cloud-sql-proxy
+              image: gcr.io/cloud-sql-connectors/cloud-sql-proxy@sha256:e8c76356fb586300c63f0d29c8c75cfeeba33c29736f9d4afa2df2d78cd0fa19
+              args:
+                - "--private-ip"
+                - "--address=127.0.0.1"
+                - "--port=5432"
+                - "--health-check"
+                - "--http-address=0.0.0.0"
+                - "--http-port=9090"
+                - "--lazy-refresh"
+                - "--max-sigterm-delay=8s"
+                - "--min-sigterm-delay=2s"
+                - "--exit-zero-on-sigterm"
+                - "--max-connections=1"
+                - "--quitquitquit"
+                - "--admin-port=9091"
+                - "gen6th-accord-production:asia-southeast1:accord-prod-db"
+              startupProbe:
+                httpGet:
+                  path: /startup
+                  port: 9090
+                periodSeconds: 2
+                timeoutSeconds: 1
+                failureThreshold: 30
+              resources:
+                limits:
+                  cpu: "0.5"
+                  memory: 256Mi

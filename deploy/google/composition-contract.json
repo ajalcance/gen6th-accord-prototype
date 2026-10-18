@@ -1,0 +1,81 @@
+{
+  "kind": "source-preparation-only",
+  "deployment_authorized": false,
+  "project": "gen6th-accord-production",
+  "region": "asia-southeast1",
+  "tasks_queue_state": "PAUSED",
+  "images": {"application": null, "sql_proxy": null, "scanner": null},
+  "review": "docs/runbooks/google-container-composition.md",
+  "references": ["sql-proxy-contract.json", "scanner-contract.json", "sql-roles-contract.json"],
+  "runtime_profiles": {
+    "api": {
+      "platform_candidate": "service",
+      "entrypoint": "uvicorn accord.main:app --host 0.0.0.0 --port 8000 --no-access-log",
+      "identity": "accord-api",
+      "sql_profile": "accord_api",
+      "dependencies": ["sql_proxy", "redis_tls", "scanner_when_photos_enabled"],
+      "startup": ["native_proxy_startup_pending_manifest", "existing_sql_role_guard", "bounded_scanner_probe_when_non_development_photos_enabled", "asgi_yield"],
+      "ingress_port": 8000,
+      "health_path": "/health",
+      "candidate_limits": {"processes": 1, "concurrency": 2, "min_instances": 0, "max_instances": 1},
+      "secret_metadata": {"redis_auth": "accord-prod-redis-auth/versions/1", "redis_ca": "accord-prod-redis-ca/versions/1", "secret_key": "accord-prod-app-secret/versions/1", "session_key": "accord-prod-session-key/versions/1"},
+      "pending": ["zynth_deferred_factory_requires_configuration", "sql_login_binding", "public_key_conversion", "native_scanner_startup_signal", "idle_definition_updates", "same_origin_and_invoker_review"]
+    },
+    "reference": {
+      "platform_candidate": "authenticated_private_service",
+      "current_entrypoint": "accord.main:app",
+      "isolated_entrypoint": null,
+      "identity": "accord-reference",
+      "sql_profile": "accord_reference",
+      "execution_dependencies": ["sql_proxy", "wrapping_kms", "vision", "vertex"],
+      "shared_factory_dependencies": ["zynth_configuration", "redis_tls", "photos_inspector", "optional_signing_and_investigation"],
+      "candidate_limits": {"processes": 1, "concurrency": 1, "min_instances": 0, "max_instances": 1},
+      "pending": ["separate_factory_owner_review", "reference_redis_secret_access_not_recorded", "sql_login_binding", "private_invoker_routing", "scanner_requirement_after_isolation"]
+    },
+    "compliance": {
+      "platform_candidate": "worker_pool",
+      "entrypoint": "python -m accord.command.worker",
+      "identity": "accord-compliance",
+      "sql_profile": "accord_compliance",
+      "dependencies": ["sql_proxy", "redis_tls"],
+      "scanner_required": false,
+      "candidate_limits": {"processes": 1, "instances": 1},
+      "secret_metadata": {"redis_auth": "accord-prod-redis-auth/versions/1", "redis_ca": "accord-prod-redis-ca/versions/1", "secret_key_binding": null},
+      "native_worker_health": null,
+      "pending": ["progress_health_and_signal_packaging", "sql_login_binding", "secret_key_binding_and_access", "regional_platform_acceptance"]
+    },
+    "migration": {
+      "platform_candidate": "job",
+      "entrypoint": "python -m accord.db.migration_job --target <reviewed revision>",
+      "identity": "accord-migration",
+      "sql_profile": "accord_migrator",
+      "dependencies": ["sql_proxy"],
+      "scanner_required": false,
+      "redis_required": false,
+      "candidate_limits": {"tasks": 1, "parallelism": 1, "automatic_retries": 0},
+      "startup_deadline_seconds": 60,
+      "shutdown_request_deadline_seconds": 3,
+      "pending": ["operator_credential_binding", "secret_key_binding_and_access", "actual_proxy_exit_and_job_completion", "native_job_dependencies"]
+    }
+  },
+  "resource_candidates_not_measured": {
+    "application": {"vcpu": 1, "memory_mib": 512},
+    "proxy": {"vcpu": 1, "memory_mib": 512},
+    "scanner": {"vcpu": 1, "memory_mib": 4096, "scans_per_adapter": 2},
+    "selected_allocations": null,
+    "acceptance": ["cold_definitions", "concurrent_max_input", "reload_peak", "definition_volume_memory", "restart", "revision_overlap_sql_capacity"]
+  },
+  "mounts": {
+    "redis_ca": {"application_only": true, "read_only": true, "path": null},
+    "sql_credentials": {"application_only": true, "binding": null},
+    "scanner_definitions": {"scanner_only": true, "writable": true, "storage": null, "size_limit": null},
+    "scanner_application_secrets": false,
+    "scanner_private_originals": false,
+    "independent_container_iam_boundary": false
+  },
+  "private_ports": {"sql_loopback": 5432, "proxy_native_health": 9090, "migration_proxy_admin_loopback": 9091, "scanner_loopback": 3310, "redis_tls_vpc": 6378},
+  "routing_selected": false,
+  "idle_scanner_cpu_candidate": "instance_based_billing_with_fresh_cold_start_definitions",
+  "live_acceptance": "pending",
+  "source_full_gate": "pending_checkpoint_11"
+}

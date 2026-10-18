@@ -1,0 +1,23 @@
+# Copier answers — records how this project was generated so `copier update` can
+# pull template improvements later. Changes here are overwritten by Copier; do not edit.
+_commit: v3.0.2
+_src_path: gh:ajalcance/zynth-setup
+author_email: withheld
+author_name: Albert Alcance
+github_owner: ajalcance
+github_repo: gen6th-accord
+include_claude_hooks: true
+include_compliance_spine: true
+include_deploy: true
+include_docs_site: true
+include_frontend: true
+initial_version: 0.1.0
+license: LicenseRef-Evaluation-Notice
+project_description: 'Accountability infrastructure for work made by people, institutions
+    and AI agents: governed collaboration, structured claims and independently verifiable
+    trust.'
+project_name: Gen6th Accord
+project_slug: gen6th-accord
+python_package: accord
+server_host: accord.gen6th.com
+solo_maintainer: true

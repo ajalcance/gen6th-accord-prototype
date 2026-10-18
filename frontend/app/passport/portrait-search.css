@@ -1,0 +1,39 @@
+.portrait-search {
+  margin-top: var(--space-4);
+}
+.portrait-search > summary {
+  cursor: pointer;
+  min-height: var(--control-height);
+  display: list-item;
+  font-weight: 600;
+}
+.portrait-search ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.portrait-search li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.portrait-search li button {
+  margin-left: auto;
+}
+.similarity-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+.portrait-search fieldset {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+.portrait-search .saved-fields dd {
+  overflow-wrap: anywhere;
+}

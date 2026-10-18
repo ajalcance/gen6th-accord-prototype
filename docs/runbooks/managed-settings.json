@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Edit(./.claude/settings.json)",
+      "Write(./.claude/settings.json)",
+      "MultiEdit(./.claude/settings.json)",
+      "NotebookEdit(./.claude/settings.json)",
+      "Edit(./.claude/settings.local.json)",
+      "Write(./.claude/settings.local.json)",
+      "MultiEdit(./.claude/settings.local.json)",
+      "NotebookEdit(./.claude/settings.local.json)",
+      "Edit(~/.claude/settings.json)",
+      "Write(~/.claude/settings.json)",
+      "MultiEdit(~/.claude/settings.json)",
+      "NotebookEdit(~/.claude/settings.json)",
+      "Edit(//Library/Application Support/ClaudeCode/**)",
+      "Write(//Library/Application Support/ClaudeCode/**)",
+      "MultiEdit(//Library/Application Support/ClaudeCode/**)",
+      "NotebookEdit(//Library/Application Support/ClaudeCode/**)"
+    ]
+  }
+}

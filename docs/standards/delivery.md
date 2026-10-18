@@ -1,0 +1,51 @@
+# REL — Delivery standards
+
+How a change gets from a branch to production, and what has to be true at each step. Markers are
+explained in [`README.md`](README.md); the **Mechanism** column names what enforces a rule, and
+is empty when nothing does.
+
+## Source control
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| REL-001 | `main` is protected, linear and always releasable. Changes reach it only through a pull request. | `[CI]` | `.github/rulesets/main.json` |
+| REL-002 | Branches are short-lived, hold one logical change, and use an accepted prefix. | `[Review]` | — |
+| REL-003 | Commits follow Conventional Commits, one logical change each. | `[Review]` | — |
+| REL-004 | One aggregate check is the required gate, and every job fans into it. A job outside it cannot block a merge. | `[CI]` | `tests/guards/test_workflow_invariants.py` |
+| REL-005 | Semantic correctness of a change is a review judgement. A green pipeline means no gate objected, not that the change is right. | `[Review]` | — |
+
+## Documentation as a gate
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| REL-010 | A shipped module, route or dependency appears on the as-built page in the same change that adds it. | `[CI]` | `scripts/dod-check.py` |
+| REL-011 | A file path written in the docs must exist. A reference to a renamed file makes every later reader wrong. | `[CI]` | `scripts/dod-check.py` |
+| REL-012 | Decision records are numbered contiguously, never reused, and indexed. An unfindable ADR gets silently re-litigated. | `[CI]` | `scripts/dod-check.py` |
+| REL-013 | The lessons log stays newest-first, so the log keeps the one property that makes it a log. | `[CI]` | `scripts/dod-check.py` |
+| REL-014 | Every pull request declares its memory impact, and the declaration is checked against the diff in both directions. | `[CI]` | `scripts/pr_declaration.py` |
+| REL-015 | A new design decision is written as an ADR before it is implemented silently. Implementing an already-decided plan needs no new ADR. | `[Review]` | — |
+| REL-016 | A user-visible change is recorded in the changelog under the unreleased heading. | `[Review]` | — |
+| REL-017 | The repository is the durable memory. When a session note and the repository disagree, the repository wins. | `[Review]` | — |
+| REL-018 | The repository-wide gate set has ONE definition — `make policy` — which CI invokes rather than relisting. Two lists mean a gate can be added to one and forgotten in the other. | `[CI]` | `tests/guards/test_workflow_invariants.py` |
+| REL-019 | The guards, their fault tests and the session hooks are linted like any other code. A path missing from a lint target is a tree nothing checks. | `[CI]` | `ruff-harness.toml` |
+
+## Release
+
+| ID | Rule | Enforcement | Mechanism |
+|---|---|---|---|
+| REL-020 | Production stand-ins are registered, and each register entry still has a marker in the tree. The register and the code are checked against each other in both directions. | `[CI]` | `scripts/prod_readiness.py` |
+| REL-021 | A release is denied while any registered production blocker is open. Advisory during development, strict at the release boundary. | `[CI]` | `scripts/release_preflight.py` |
+| REL-022 | A release tag must be an ancestor of the default branch. Nothing is signed from an unmerged tree. | `[CI]` | `.github/workflows/release.yml` |
+| REL-023 | Images are signed and referenced by digest, and the signature is verified on the host before anything runs. | `[CI]` | `deploy/verify.sh` |
+| REL-024 | Deployment promotes the exact reviewed artifact. Rebuilding ships bytes nobody reviewed, even from the same source. | `[CI]` | `tests/guards/test_workflow_invariants.py` |
+| REL-025 | A build-once candidate carries an SBOM and an evidence record, signed, and promotion never rebuilds. | `[CI]` | `.github/workflows/release.yml` |
+| REL-026 | An owner-applied release-blocker label on an open issue denies a release outright, and a hold that cannot be read counts as active. | `[CI]` | `scripts/release_preflight.py` |
+| REL-027 | Nothing is released without a changelog entry for that version. A release nobody downstream can evaluate is not finished. | `[CI]` | `scripts/release_preflight.py` |
+| REL-028 | A published tag is never re-pointed. Moving it changes what that version means for everyone who already has it. | `[CI]` | `scripts/release_preflight.py` |
+| REL-029 | The release record names every image by digest. A tag is a mutable pointer, so evidence naming one records a name, not bytes. | `[CI]` | `scripts/release_evidence.py` |
+| REL-030 | Promotion verifies that the evidence in hand is the evidence **for that release**, not merely a valid document. | `[CI]` | `scripts/release_evidence.py` |
+| REL-031 | Moving what production pulls requires a typed confirmation. A control you can satisfy by reflex is not a control. | `[CI]` | `tests/guards/test_workflow_invariants.py` |
+| REL-032 | The production-readiness verdict is recorded inside the signed evidence and read from there. A scan run at promotion or on the deploy host describes the wrong tree. | `[CI]` | `scripts/release_evidence.py` |
+| REL-033 | A release whose readiness verdict was not clean at build time is never promotable, and a release recording no verdict at all is refused. | `[CI]` | `scripts/release_evidence.py` |
+| REL-034 | The SBOM scan runs before anything is recorded, signed or published. Scanning afterwards rejects a release that already looks legitimate. | `[CI]` | `tests/guards/test_workflow_invariants.py` |
+| REL-035 | A release requires the tagged commit's own CI run on the default branch to have completed green. A green pull request is not a green default branch, and a missing push run counts as a failed one. | `[CI]` | `scripts/release_preflight.py` |

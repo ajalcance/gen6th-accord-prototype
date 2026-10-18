@@ -1,0 +1,25 @@
+{
+  "name": "braces",
+  "version": "3.0.4-accord.1",
+  "private": true,
+  "description": "Private depth-guard backport of upstream braces 3.0.3",
+  "license": "MIT",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib",
+    "UPSTREAM.md"
+  ],
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "dependencies": {
+    "fill-range": "7.1.1"
+  },
+  "accordBackport": {
+    "upstream": "micromatch/braces",
+    "release": "3.0.3",
+    "commit": "74b2db2938fad48a2ea54a9c8bf27a37a62c350d",
+    "patchSha256": "a3f08706e45f1e180112f91f07a871b284b92613bccdfb2724a165ff4f96c91e"
+  }
+}

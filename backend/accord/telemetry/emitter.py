@@ -1,0 +1,75 @@
+"""Fail-open event emission to a capped Redis Stream.
+
+Emission NEVER fails a request: if Redis is down, the error is swallowed. A per-request
+``Telemetry`` helper binds the client IP so handlers just call ``tel.emit(...)``.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from fastapi import Depends, Request
+from redis.asyncio import Redis
+
+from accord.auth import ANONYMOUS, Principal, get_principal
+from accord.cache.redis import get_redis
+from accord.config import get_settings
+from accord.telemetry.envelope import SOURCE_CLIENT, client_ip, make_event
+
+
+async def emit(redis: Redis, event: dict[str, Any]) -> None:
+    """Emit one envelope to the capped stream. Fail-open (swallows any error)."""
+    settings = get_settings()
+    if not settings.telemetry_enabled:
+        return
+    try:
+        await redis.xadd(
+            settings.telemetry_stream,
+            {"e": json.dumps(event)},
+            maxlen=settings.telemetry_stream_maxlen,
+            approximate=True,
+        )
+    except Exception:  # noqa: BLE001 — telemetry must never break a request
+        return
+
+
+class Telemetry:
+    """Per-request emission helper: binds the request's IP, principal, and a Redis client."""
+
+    def __init__(self, redis: Redis, ip: str | None, principal: Principal = ANONYMOUS) -> None:
+        self._redis = redis
+        self._ip = ip
+        self._principal = principal
+
+    async def emit(self, **kwargs: Any) -> None:
+        """Build an envelope (``make_event`` fields) and emit it, fail-open.
+
+        The acting principal (from the request's bearer token, else anonymous) is recorded as
+        the event actor unless the caller overrides it — EXCEPT for client-sourced events.
+        For ``source=SOURCE_CLIENT`` the attribution fields are **overwritten** from the
+        verified request, never merely defaulted: a client-reported event whose actor came from
+        anywhere but the verified principal is exactly the falsehood ADR-0012 exists to prevent,
+        and enforcing it here means every call site gets the guarantee, not just the ones that
+        remember the rule.
+        """
+        if kwargs.get("source") == SOURCE_CLIENT:
+            kwargs["actor_type"] = self._principal.type
+            kwargs["actor_id"] = self._principal.id
+            kwargs["sid"] = self._principal.sid
+            kwargs["ip"] = self._ip
+        else:
+            kwargs.setdefault("ip", self._ip)
+            kwargs.setdefault("actor_type", self._principal.type)
+            kwargs.setdefault("actor_id", self._principal.id)
+            kwargs.setdefault("sid", self._principal.sid)
+        await emit(self._redis, make_event(**kwargs))
+
+
+def get_telemetry(
+    request: Request,
+    redis: Redis = Depends(get_redis),
+    principal: Principal = Depends(get_principal),
+) -> Telemetry:
+    """FastAPI dependency yielding a request-bound telemetry emitter."""
+    return Telemetry(redis, client_ip(request), principal)

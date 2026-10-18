@@ -1,0 +1,189 @@
+# Gen6th Accord — developer command surface.
+# One reliable entry point for the checks the CLAUDE.md Definition of Done requires,
+# so "run all checks" is a single command, not several remembered by hand.
+#
+#   make check        full local gate
+#   make policy       the repository-wide guards (the same list CI runs)
+#   make harness      lint the guards, their tests and the hooks
+#   make backend      backend gate only (the common per-slice case)
+#   make fmt          auto-format everything
+#   make dod-check    doc-consistency guards (as-built + stale refs)
+#
+# Recipes are single-line && chains (not .ONESHELL) so they work on macOS's
+# GNU Make 3.81 as well as CI's newer make.
+
+.DEFAULT_GOAL := help
+
+# Artifact checks require real, previously signature-verified inputs. No fixture fallback.
+SCANNER_PYTHON ?= python3
+.PHONY: scanner-launch-check
+scanner-launch-check:
+	@test -n "$(SCANNER_MANIFEST)" -a -n "$(SCANNER_CONFIG)" -a -n "$(SCANNER_SERVICE)" -a -n "$(SCANNER_IMAGE)" || { echo "scanner-launch-check: all four artifact inputs are required"; exit 1; }
+	"$(SCANNER_PYTHON)" scripts/scanner_image_binding.py --manifest "$(SCANNER_MANIFEST)" --image-config "$(SCANNER_CONFIG)" --service "$(SCANNER_SERVICE)" --scanner-image "$(SCANNER_IMAGE)" && \
+	"$(SCANNER_PYTHON)" scripts/scanner_launch_guard.py --image-config "$(SCANNER_CONFIG)" --service "$(SCANNER_SERVICE)" --scanner-image "$(SCANNER_IMAGE)"
+
+.PHONY: help context risk-context preflight release-preflight check policy harness backend trust fmt test lint dod-check guard-tests frontend docs-site secret-scan
+
+help:
+	@echo "Targets: context | risk-context | preflight | check | policy | harness | guard-tests | backend | trust | frontend | docs-site | fmt | test | lint | dod-check | release-preflight | secret-scan"
+
+# ---- Backend (Python) — uses the repo venv directly, no activation needed ----
+# bandit's -x is a PREFIX match against the paths it scans, and `-r .` yields paths that
+# begin `./` — so the `-x tests` this shipped with excluded nothing, measurably: on a
+# three-line fixture it scanned 3 of 3 lines where `-x ./tests` scanned 1. CI was green
+# regardless, because a runner has no virtualenv; a developer who follows CLAUDE.md §4 and
+# creates one at backend/.venv scanned 2,014,372 lines and collected 84 high findings from
+# websockets and pip. The command the contract calls the local gate could not pass for them.
+#
+# `./.venv` does not exist on a runner and bandit tolerates the missing path, so ONE string
+# works in both environments — which is the point. A guard that behaves one way locally and
+# another way in CI teaches you to trust the wrong one (EXP-0002).
+backend:
+	cd backend && \
+	.venv/bin/ruff check . && \
+	.venv/bin/black --check . && \
+	.venv/bin/mypy . && \
+	.venv/bin/bandit -r . -ll -q -x ./tests,./.venv && \
+	.venv/bin/pip-audit -r requirements.txt -r requirements-dev.txt && \
+	.venv/bin/pytest -q --cov
+
+# ---- Trust services (Go) ----
+# Must mirror the CI `trust` job exactly (tests/guards/test_workflow_invariants.py). Locally the
+# pinned golangci-lint and govulncheck live in .tools/bin; in CI they are on PATH. Go's caches
+# stay in the project because the agent's sandbox cannot write the home directory, and
+# GOTOOLCHAIN=local stops go.mod from silently downloading a different toolchain.
+trust: export GOCACHE := $(CURDIR)/.cache/go-build
+trust: export GOMODCACHE := $(CURDIR)/.cache/go-mod
+trust: export GOPATH := $(CURDIR)/.cache/go
+trust: export GOLANGCI_LINT_CACHE := $(CURDIR)/.cache/golangci-lint
+trust: export GOTOOLCHAIN := local
+trust: export PATH := $(CURDIR)/.tools/bin:$(PATH)
+trust:
+	cd trust && \
+	go mod verify && \
+	go vet ./... && \
+	golangci-lint run ./... && \
+	govulncheck ./... && \
+	go test -race ./...
+
+# ---- Frontend (Next.js) ----
+# Must mirror the CI `frontend` job in .github/workflows/ci.yml exactly — if the two
+# drift, a check that passes locally can be absent from the merge gate. Keep in sync.
+frontend:
+	cd frontend && \
+	npm run lint && \
+	npx prettier --check . && \
+	npx tsc --noEmit && \
+	npm audit --audit-level=high && \
+	npm test --if-present && \
+	npm run build && \
+	npm run bundle-size
+
+# ---- Docs site (Next.js) ----
+# Must mirror the CI `docs` job exactly (tests/guards/test_workflow_invariants.py). `npm test`
+# is the public-only rule's gate: it proves the site publishes docs/public/ and nothing else.
+# No --if-present here, unlike the frontend: a harness that silently vanished would pass.
+docs-site:
+	cd docs-site && \
+	npm run lint && \
+	npx prettier --check . && \
+	npm audit --audit-level=high && \
+	npm test && \
+	npm run build
+
+# Session-start snapshot, DERIVED from the repository. Prints only — persisting a summary
+# would create a second copy of the truth that drifts from the first.
+context:
+	python3 scripts/context.py
+
+# Which recorded lessons apply to what you are changing right now. Advisory, always exits 0 —
+# retrieval never overrides code, tests, ADRs or live settings. See experience/README.md.
+risk-context:
+	python3 scripts/risk_context.py
+
+# Environment diagnostic — what `make check` needs, and how to install anything missing.
+preflight:
+	python3 scripts/preflight.py
+
+# Negative tests proving each guard in scripts/ CAN fail. A guard that silently stops working
+# reports green while checking nothing — these make that a test failure. See tests/guards/README.md.
+guard-tests:
+	backend/.venv/bin/pytest tests/guards -q
+
+# Full gate — everything. preflight runs first so a missing toolchain is named, not cryptic.
+check: preflight guard-tests policy harness backend frontend docs-site
+
+# Convenience aliases referenced in CLAUDE.md and the PR template.
+test:
+	cd backend && .venv/bin/pytest -q
+
+lint:
+	cd backend && .venv/bin/ruff check . && .venv/bin/black --check . && .venv/bin/mypy .
+
+fmt:
+	cd backend && .venv/bin/ruff check --fix . && .venv/bin/black .
+	cd frontend && npx prettier --write . >/dev/null
+	cd docs-site && npx prettier --write . >/dev/null
+
+# Fail-closed checks that only matter at a release boundary: tag hygiene, an entry in the
+# changelog, open production blockers, release-blocker holds, and the doc/standards guards.
+# TAG is required — a release you did not name is a release you did not mean.
+release-preflight:
+	@test -n "$(TAG)" || { echo "usage: make release-preflight TAG=v1.2.3"; exit 1; }
+	python3 scripts/release_preflight.py --tag "$(TAG)"
+
+# ---- The harness: lint the files that check everything else -----------------
+# `make backend` runs ruff and black over backend/ only, so until this target existed the
+# guards, their fault tests and the session hooks were the one part of the repository nothing
+# checked. A path missing from a lint target is a tree nothing type-checks.
+#
+# The rule set lives in ruff-harness.toml with a written reason for each exclusion. It is
+# green on a freshly generated project and the template self-test keeps it that way: a gate
+# that has never been green is not a gate, it is a broken build that teaches people to ignore
+# the colour.
+#
+# Deliberately NOT mypy --strict. That would arrive with several hundred findings on day one,
+# which is the same trap from the other side. Worth doing as its own piece of work.
+harness:
+	backend/.venv/bin/ruff check --config ruff-harness.toml scripts tests/guards .claude/hooks && \
+	backend/.venv/bin/black --check -l 100 scripts tests/guards .claude/hooks
+
+# ---- The policy gate set — ONE definition -----------------------------------
+# Every repository-wide guard, in one list. The CI `static` job calls this target rather than
+# relisting the scripts, and so does the pre-push hook, because two lists mean a gate can be
+# added to one and forgotten in the other — which is not hypothetical: it is how a gate can
+# join the local suite and then not run in CI for four consecutive pushes.
+#
+# tests/guards/test_workflow_invariants.py fails if CI invokes any of these scripts BOTH
+# directly and through `make policy`, and if this list is ever empty.
+#
+# The diff-based guards (meta_guard, pr_declaration) are deliberately NOT here: they need a
+# base ref and a PR payload, so they belong to the pull-request context, not to a local run.
+policy:
+	python3 scripts/check_guard_coverage.py && \
+	python3 scripts/check_unicode_hazards.py && \
+	python3 scripts/risk_context.py --validate && \
+	python3 scripts/dod-check.py && \
+	python3 scripts/prod_readiness.py && \
+	python3 scripts/standards_check.py && \
+	python3 scripts/check_agent_local_settings.py && \
+	python3 scripts/check_pins.py backend/requirements.txt backend/requirements-dev.txt requirements-ci.txt
+
+# ---- Secret scan over COMMITS, proven by a canary --------------------------
+# The CI `hygiene` job calls this target with a pinned, checksum-verified gitleaks and the PR's
+# base (or the push's `before`). Locally it needs gitleaks on PATH (`brew install gitleaks`)
+# and at least one commit in BASE..HEAD — an empty range is refused, never reported clean.
+# Not part of `make check`: on an up-to-date main the range is empty, and a gate that refuses
+# on a clean tree would teach you to skip it. The pre-commit hook covers the staged change.
+BASE ?= origin/main
+GITLEAKS ?= gitleaks
+secret-scan:
+	python3 scripts/secret_scan.py --base "$(BASE)" --gitleaks "$(GITLEAKS)"
+
+# Documentation consistency guards + the production-readiness register + standards honesty.
+# Kept as its own name because CLAUDE.md §2 and the PR template both cite it; it is a subset
+# of `make policy`, never a second list of the same things.
+dod-check:
+	python3 scripts/dod-check.py && \
+	python3 scripts/prod_readiness.py && \
+	python3 scripts/standards_check.py
