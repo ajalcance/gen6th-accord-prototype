@@ -1,5 +1,5 @@
 # Next.js production image (multi-stage, non-root).
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS build
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS build
 WORKDIR /app
 # The API rewrite in next.config.ts is read when `next build` evaluates the config, so the
 # origin must be present at BUILD time; the run stage repeats it so build and runtime agree.
@@ -14,7 +14,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS run
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS run
 WORKDIR /app
 ARG ACCORD_API_ORIGIN=""
 ARG ACCORD_CONNECTION_ENABLED="false"
