@@ -11,7 +11,7 @@
     "bundle-size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
-    "next": "16.3.8",
+    "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -24,9 +24,9 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5",
     "eslint": "^9",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.0",
     "jsdom": "^26",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.10",
     "typescript": "^5",
     "vitest": "4.1.11"
   },
