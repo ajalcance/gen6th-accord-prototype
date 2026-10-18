@@ -5,7 +5,7 @@
 # Dependabot parses 3.12 → 3.13 as a PATCH bump, so the minor-version ignore rule in
 # .github/dependabot.yml never applied (#19). The Python version must match CI and the backend
 # image — tests/guards/test_runtime_alignment.py checks.
-FROM mcr.microsoft.com/devcontainers/python:3.12-bookworm@sha256:edf22d42b215ab03876d5523aff0e31a0e0c69afb9bd05bc4e2724b2af697a65
+FROM mcr.microsoft.com/devcontainers/python:3.12-bookworm@sha256:589b65db720b03c96d721706005f176ff467ee879f92c2d137c04a537feffa56
 
 # Firewall tooling. iptables/ipset apply the policy at container start (needs NET_ADMIN).
 # Reviewed exception (ADR-0018, 2026-09-24): hadolint DL3008 asks for pinned apt versions. This
